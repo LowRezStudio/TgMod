@@ -1,0 +1,10 @@
+*
+!.gitignore
+!filelist.txt
+!tool.nu
+!Development/
+!Development/Src/
+!Development/Src/**
+!UDKGame/
+!UDKGame/Config/
+!UDKGame/Config/DefaultEngine.ini
