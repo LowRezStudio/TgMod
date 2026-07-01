@@ -1,0 +1,16 @@
+[mod]
+id = "TgMod"
+name = "TgMod (Console + Multiplayer)"
+version = "1.0.0"
+
+[[mod.authors]]
+name = "Cinnamon 🇧🇪"
+link = "https://github.com/SupImCinnamon"
+
+[[mod.authors]]
+name = "Tom"
+link = "https://github.com/Xiloe"
+
+[[mod.authors]]
+name = "Kyiro"
+link = "https://github.com/Kyiro"

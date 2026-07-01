@@ -1,7 +1,12 @@
 *
 !.gitignore
+!bundle.yaml
 !filelist.txt
 !tool.nu
+!manifest.toml
+!README.md
+!Config/
+!Config/*
 !Development/
 !Development/Src/
 !Development/Src/**

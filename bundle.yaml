@@ -1,0 +1,6 @@
+files:
+  "README.md": "README.md"
+  "manifest.toml": "manifest.toml"
+  "Config/*": "files/ChaosGame/Config/"
+  "UDKGame/Script/TgMod.u": "files/ChaosGame/CookedPCConsole/TgMod.upk"
+  "UDKGame/Script/TempestMp.u": "files/ChaosGame/CookedPCConsole/TempestMp.upk"
