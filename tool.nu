@@ -77,7 +77,7 @@ def --wrapped windows [
     ...rest
 ] {
     if $nu.os-info.name == "windows" {
-        ^...$rest
+        ^$rest.0 ...($rest | skip 1)
         return
     }
 
