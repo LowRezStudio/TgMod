@@ -1,0 +1,10 @@
+class SeqAct_SetRigidBodyIgnoreVehicles extends SequenceAction
+    native(Sequence)
+    hidecategories(Object);
+
+defaultproperties
+{
+    InputLinks[0]=(LinkDesc="Turn On",bHasImpulse=false,QueuedActivations=0,bDisabled=false,bDisabledPIE=false,LinkedOp=none,DrawY=0,bHidden=false,ActivateDelay=0.0000000,bMoving=false,bClampedMax=false,bClampedMin=false)
+    InputLinks[1]=(LinkDesc="Turn Off",bHasImpulse=false,QueuedActivations=0,bDisabled=false,bDisabledPIE=false,LinkedOp=none,DrawY=0,bHidden=false,ActivateDelay=0.0000000,bMoving=false,bClampedMax=false,bClampedMin=false)
+    ObjName="Set RigidBodyIgnoreVehicles"
+}

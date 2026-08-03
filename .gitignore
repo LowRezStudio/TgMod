@@ -5,6 +5,8 @@
 !tool.nu
 !manifest.toml
 !README.md
+!exported/
+!exported/**
 !Config/
 !Config/*
 !Development/
