@@ -1,2 +1,2 @@
-class UtEditor extends Object
+class UTEditor extends Object
     abstract;
