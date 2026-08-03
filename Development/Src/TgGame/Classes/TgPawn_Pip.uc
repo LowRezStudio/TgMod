@@ -1,1 +1,0 @@
-class TgPawn_Pip extends TgPawn_Character;
