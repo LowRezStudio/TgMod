@@ -12,7 +12,7 @@ class LevelStreaming extends Object
 	native;
 
 /** Name of the level package name used for loading.																		*/
-var() name							PackageName;  // HACK: un-const'd for paladins
+var() editconst const name							PackageName;
 
 /** Pointer to Level object if currently loaded/ streamed in.																*/
 var transient const	level							LoadedLevel;

@@ -25,12 +25,6 @@ struct {QWORD} qword
 	var() native int A, B;
 };
 
-// MOD: Added this from Paladins
-struct {DWORD} dword
-{
-    var() native int A;
-};
-
 //=============================================================================
 // UObject variables.
 
