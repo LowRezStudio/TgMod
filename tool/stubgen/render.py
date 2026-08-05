@@ -159,7 +159,8 @@ def _member_lines(m: Any) -> List[str]:
 
 
 def render_class(c: ClassDecl) -> str:
-    kind = "interface" if c.kind == "interface" else "class"
+    # Fix UE Explorer decompilation error: classes named Interface_* are actually interfaces
+    kind = "interface" if (c.kind == "interface" or c.name.startswith("Interface_")) else "class"
     header = f"L{c.header_line:<6} {kind} {c.name}"
     if c.extends:
         header += f" extends {c.extends}"

@@ -213,7 +213,9 @@ def emit_stub(c: ClassDecl) -> str:
     if c.name == "None":
         return ""
 
-    kind = "interface" if c.kind == "interface" else "class"
+    # Fix UE Explorer decompilation error: classes named Interface_* are actually interfaces
+    # The decompiler incorrectly outputs them as "class Interface_..." instead of "interface Interface_..."
+    kind = "interface" if (c.kind == "interface" or c.name.startswith("Interface_")) else "class"
     lines = []
 
     # Class header
