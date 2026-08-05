@@ -237,10 +237,10 @@ def _prepare_output_dir(args: argparse.Namespace, package: str) -> str:
     return out_dir
 
 
-def _compute_package_order(root: str) -> List[str]:
-    """Compute topological order of non-stock packages based on extends dependencies."""
+def _compute_package_order(root: str, include_stock: bool = False) -> List[str]:
+    """Compute topological order of packages based on extends dependencies."""
     packages = [d for d in sorted(os.listdir(root))
-                if os.path.isdir(os.path.join(root, d)) and d not in STOCK_PACKAGES]
+                if os.path.isdir(os.path.join(root, d)) and (include_stock or d not in STOCK_PACKAGES)]
 
     # Map class names to packages
     class_to_pkg = {}
@@ -347,7 +347,10 @@ def cmd_stub(args: argparse.Namespace) -> int:
         root = args.root
         # If --all, compute package order first and process in that order
         if args.all:
-            pkg_order = _compute_package_order(root)
+            pkg_order = _compute_package_order(root, include_stock=True)
+            # Default to --replace when using --all
+            if not args.replace:
+                args.replace = True
             # Filter by --only if specified
             if args.only:
                 pkg_order = [p for p in pkg_order if p == args.only]
