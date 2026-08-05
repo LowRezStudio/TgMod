@@ -55,15 +55,45 @@ def _var_str(vg: VarGroup) -> str:
 
 
 def _fn_str(fn: FunctionDecl) -> str:
-    mods = " ".join(fn.modifiers)
+    # Build parts in the correct source order:
+    # 1. native(index) or bare "native"
+    # 2. other modifiers (static, final, etc.) except bare "native"
+    # 3. operator(priority)
+    # 4. operator_kind (preoperator/operator/postoperator) or kind (function/event/delegate)
+    # 5. return_type
+    # 6. name(params)
     bits = []
-    if mods:
-        bits.append(mods)
-    if fn.kind:
+
+    # 1. native(index) - comes first in source
+    if fn.native_index:
+        bits.append(f"native({fn.native_index})")
+    elif "native" in fn.modifiers:
+        # Bare "native" keyword (no index)
+        bits.append("native")
+
+    # 2. Other modifiers (excluding bare "native" since we handled it above)
+    other_mods = [m for m in fn.modifiers if m != "native"]
+    if other_mods:
+        bits.append(" ".join(other_mods))
+
+    # 3. operator(priority)
+    if fn.operator_priority:
+        bits.append(f"operator({fn.operator_priority})")
+
+    # 4. operator_kind or kind
+    if fn.operator_kind:
+        if fn.operator_kind != "operator" or not fn.operator_priority:
+            bits.append(fn.operator_kind)
+    elif fn.kind:
         bits.append(fn.kind)
+
+    # 5. return type
     if fn.return_type:
         bits.append(fn.return_type)
+
+    # 6. name(params)
     bits.append(f"{fn.name}({_params_str(fn)})")
+
     head = " ".join(bits)
     if fn.is_declaration:
         return f"{head};  [declaration]"
