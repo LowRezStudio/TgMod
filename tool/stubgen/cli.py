@@ -300,11 +300,62 @@ def _compute_package_order(root: str, include_stock: bool = False) -> List[str]:
 
 
 def _write_editpackages_ini(order: List[str], out_path: str) -> None:
-    """Write +EditPackages= lines to a config file."""
+    """Write +EditPackages= lines to a config file, preserving existing sections."""
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    lines = ["[UnrealEd.EditorEngine]"]
+
+    # Read existing content to preserve pre-section lines and all sections except [UnrealEd.EditorEngine]
+    pre_section_lines = []
+    existing_sections = {}
+    if os.path.exists(out_path):
+        with open(out_path, "r", encoding="utf-8", errors="replace") as fh:
+            content = fh.read()
+
+        # Parse sections
+        current_section = None
+        section_lines = []
+        for line in content.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                if current_section is not None:
+                    existing_sections[current_section] = "\n".join(section_lines)
+                elif section_lines:
+                    # Lines before first section header
+                    pre_section_lines = list(section_lines)
+                current_section = stripped
+                section_lines = []
+            else:
+                section_lines.append(line)
+        if current_section is not None:
+            existing_sections[current_section] = "\n".join(section_lines)
+        elif section_lines and not pre_section_lines:
+            pre_section_lines = list(section_lines)
+
+    # Build new content
+    lines = []
+
+    # Preserve lines before first section header (e.g., BasedOn=...)
+    if pre_section_lines:
+        lines.extend(pre_section_lines)
+        lines.append("")
+
+    # Preserve [Configuration] section if it exists
+    if "[Configuration]" in existing_sections:
+        lines.append("[Configuration]")
+        lines.append(existing_sections["[Configuration]"].strip())
+        lines.append("")
+
+    # Preserve any other sections except [UnrealEd.EditorEngine] which we regenerate
+    for section_name, section_content in existing_sections.items():
+        if section_name not in ("[Configuration]", "[UnrealEd.EditorEngine]"):
+            lines.append(section_name)
+            lines.append(section_content.strip())
+            lines.append("")
+
+    # Write [UnrealEd.EditorEngine] with EditPackages
+    lines.append("[UnrealEd.EditorEngine]")
     for pkg in order:
         lines.append(f"+EditPackages={pkg}")
+
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
     print(f"wrote {out_path}")
@@ -312,10 +363,15 @@ def _write_editpackages_ini(order: List[str], out_path: str) -> None:
 
 def _write_stub_file(c: ClassDecl, out_dir: str, dry_run: bool) -> None:
     """Write a single stub file."""
+    # Skip placeholder None classes (UE Explorer artifacts)
+    if c.name == "None":
+        return
     os.makedirs(out_dir, exist_ok=True)
     stem = c.filename[:-3] if c.filename.endswith(".uc") else c.filename
     out_path = os.path.join(out_dir, stem + ".uc")
     stub_src = emit_stub(c)
+    if not stub_src:
+        return
     if dry_run:
         print(f"DRY RUN: would write {out_path} ({len(stub_src)} bytes)")
         print("---")

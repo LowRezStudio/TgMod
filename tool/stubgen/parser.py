@@ -447,7 +447,7 @@ class Parser:
             raise UcParseError(start.line, "struct without '{'")
 
         # Known struct modifiers that come before the name
-        STRUCT_MODIFIERS = {"atomic", "immutable", "native", "const", "static", "export", "noexport"}
+        STRUCT_MODIFIERS = {"atomic", "immutable", "native", "const", "static", "export", "noexport", "transient"}
 
         # Find struct name (first non-modifier ident after 'struct')
         # Format: struct [modifiers...] Name [extends Base] ;
