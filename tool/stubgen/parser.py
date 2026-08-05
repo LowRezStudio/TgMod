@@ -69,9 +69,12 @@ FUNCTION_MODS = {
 PARAM_MODS = {"out", "optional", "const", "coerce", "init", "ref"}
 
 # Keywords whose trailing `(...)` in a function signature is a modifier/priority
-# group (native(242), operator(24), preoperator/postoperator) rather than the
-# parameter list.
-ARG_KEYWORDS = {"native", "operator", "preoperator", "postoperator"}
+# group (native(242), operator(24)) rather than the parameter list.
+# Note: preoperator/postoperator don't have parens, so they're NOT in this set.
+ARG_KEYWORDS = {"native", "operator"}
+
+# Regex to extract index from native(XX) or operator(XX)
+INDEX_RE = re.compile(r"\((\d+)\)")
 
 _LOCAL_RE = re.compile(r"^\s*local\s+(.+?)\s*;?\s*$")
 _COMMENT_VALUE_RE = re.compile(r"//\s*(-?\d+)")
@@ -442,12 +445,39 @@ class Parser:
         head_toks, term = self._collect_until(("{",))
         if term is None:
             raise UcParseError(start.line, "struct without '{'")
+
+        # Known struct modifiers that come before the name
+        STRUCT_MODIFIERS = {"atomic", "immutable", "native", "const", "static", "export", "noexport"}
+
+        # Find struct name (first non-modifier ident after 'struct')
+        # Format: struct [modifiers...] Name [extends Base] ;
         name = None
-        for t in reversed(head_toks):
-            if t.kind == "ident":
-                name = t.text
+        extends = None
+
+        # First, collect all idents in order
+        ident_tokens = [t for t in head_toks if t.kind == "ident"]
+
+        # Skip leading modifiers
+        i = 0
+        while i < len(ident_tokens) and ident_tokens[i].text in STRUCT_MODIFIERS:
+            i += 1
+
+        # Next ident is the name
+        if i < len(ident_tokens):
+            name = ident_tokens[i].text
+            i += 1
+
+        # Check for 'extends' after name
+        while i < len(ident_tokens):
+            if ident_tokens[i].text == "extends":
+                if i + 1 < len(ident_tokens):
+                    extends = ident_tokens[i + 1].text
                 break
-        mods = [t.text for t in head_toks if t.kind == "ident" and t.text != name]
+            i += 1
+
+        # Modifiers are all idents before the name
+        mods = [t.text for t in head_toks if t.kind == "ident" and t.text in STRUCT_MODIFIERS]
+
         body_start = term.line
         self._advance_sig()  # '{'
         members: List[Any] = []
@@ -476,7 +506,7 @@ class Parser:
         if self._is_sig("op", ";"):
             self._advance_sig()
         return StructDecl(
-            line=start.line, col=start.col, name=name or "", modifiers=mods,
+            line=start.line, col=start.col, name=name or "", modifiers=mods, extends=extends,
             members=members, structdefaultproperties=sdp, body_start=body_start,
             body_end=close.line, leading_comments=comments,
         )
@@ -690,14 +720,46 @@ class Parser:
         #   native(242) static final operator(24) bool ==(...)
         # The parameter-list '(' is the first one NOT attached to a keyword.
         toks: List[Tok] = []
+        # Track native_index and operator_priority from modifier groups
+        native_index = None
+        operator_priority = None
         while True:
             t = self._peek_sig(0)
             if t.kind == "eof":
                 raise UcParseError(start.line, "function signature without '('")
             if t.kind == "op" and t.text == "(":
                 if toks and toks[-1].kind == "ident" and toks[-1].text in ARG_KEYWORDS:
+                    kw = toks[-1].text
                     self._advance_sig()  # '('
-                    self._skip_balanced_paren()
+                    # Collect the content of the paren group to extract index
+                    paren_content = []
+                    depth = 1
+                    while depth > 0:
+                        nt = self._advance_sig()
+                        if nt.kind == "op":
+                            if nt.text == "(":
+                                depth += 1
+                            elif nt.text == ")":
+                                depth -= 1
+                                if depth == 0:
+                                    break
+                        if depth > 0:
+                            paren_content.append(nt)
+                    # Extract index from paren content
+                    index = None
+                    for pt in paren_content:
+                        if pt.kind == "number":
+                            index = pt.text
+                            break
+                    if kw == "native":
+                        native_index = index
+                        # native(XX) is always a modifier group, pop it
+                        toks.pop()
+                    elif kw == "operator":
+                        operator_priority = index
+                        # operator(XX) is the priority modifier; DON'T pop the operator token
+                        # We need it later to detect op_kind (operator vs preoperator vs postoperator)
+                        pass
                     continue
                 break  # this is the parameter list
             toks.append(self._advance_sig())
@@ -730,6 +792,8 @@ class Parser:
                 raise UcParseError(start.line, "operator declaration without a symbol")
             name = self._raw_span(name_start.line, name_start.col, paren_tok.line, paren_tok.col).strip()
             mods = [t.text for t in toks[:op_idx] if t.kind == "ident"]
+            # operator_kind is already set to op_kind (operator/preoperator/postoperator)
+            operator_kind = op_kind
         else:
             kind = ""
             name = None
@@ -760,6 +824,10 @@ class Parser:
                     mods += [t.text for t in type_part[:ts] if t.kind == "ident"]
             else:
                 mods = [t.text for t in region if t.kind == "ident"]
+            # Non-operator functions don't have these
+            native_index = None
+            operator_kind = None
+            operator_priority = None
 
         self._advance_sig()  # '('
         params, close_paren = self._parse_params()
@@ -772,6 +840,7 @@ class Parser:
             self._advance_sig()
             return FunctionDecl(
                 line=start.line, col=start.col, kind=kind, modifiers=mods,
+                native_index=native_index, operator_kind=operator_kind, operator_priority=operator_priority,
                 return_type=return_type, name=name, params=params,
                 is_declaration=True, signature=signature,
                 body_start=None, body_end=None, body_text=None,
@@ -784,6 +853,7 @@ class Parser:
             locals_ = self._parse_locals(body_text, brace.line)
             return FunctionDecl(
                 line=start.line, col=start.col, kind=kind, modifiers=mods,
+                native_index=native_index, operator_kind=operator_kind, operator_priority=operator_priority,
                 return_type=return_type, name=name, params=params,
                 is_declaration=False, signature=signature,
                 body_start=brace.line, body_end=close_b.line, body_text=body_text,

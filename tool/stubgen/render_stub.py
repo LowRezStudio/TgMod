@@ -42,10 +42,23 @@ def _params_str(fn: FunctionDecl) -> str:
 
 def _fn_signature(fn: FunctionDecl) -> str:
     """Return the function signature (through closing ')') without body."""
-    mods = " ".join(fn.modifiers)
+    mods = list(fn.modifiers)
+    # Handle native(XX) and operator(XX) modifiers
+    if fn.native_index is not None:
+        # Replace native in mods with native(XX)
+        mods = [m for m in mods if m != "native"]
+        mods.insert(0, f"native({fn.native_index})")
+    if fn.operator_kind is not None and fn.operator_priority is not None:
+        # Replace operator/preoperator/postoperator in mods with operator(XX)
+        mods = [m for m in mods if m not in ("operator", "preoperator", "postoperator")]
+        mods.insert(0, f"{fn.operator_kind}({fn.operator_priority})")
+    elif fn.operator_kind is not None:
+        mods = [m for m in mods if m not in ("operator", "preoperator", "postoperator")]
+        mods.insert(0, fn.operator_kind)
+
     bits = []
     if mods:
-        bits.append(mods)
+        bits.append(" ".join(mods))
     if fn.kind:
         bits.append(fn.kind)
     if fn.return_type:
@@ -92,6 +105,8 @@ def _struct_str(s: StructDecl) -> str:
     # For stubs, native structs are emitted as normal structs without modifiers
     # and with a trailing semicolon after the closing brace
     head = f"struct {s.name}"
+    if s.extends:
+        head += f" extends {s.extends}"
     lines = [head + " {"]
     for sub in s.members:
         if isinstance(sub, VarGroup):

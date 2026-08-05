@@ -93,6 +93,9 @@ class LocalDecl:
 class FunctionDecl(Node):
     kind: str  # "function" | "event" | "delegate" | "operator" | "" (kindless)
     modifiers: List[str]  # native / final / exec / simulated / reliable / server / client ...
+    native_index: Optional[str]  # e.g., "131" from native(131)
+    operator_kind: Optional[str]  # "operator" | "preoperator" | "postoperator"
+    operator_priority: Optional[str]  # e.g., "24" from operator(24)
     return_type: Optional[str]
     name: str
     params: List[Param]
@@ -146,6 +149,7 @@ class StateDecl(Node):
 class StructDecl(Node):
     name: str
     modifiers: List[str]
+    extends: Optional[str]  # parent struct name, e.g. "Vector"
     members: List[Any]  # VarGroup
     structdefaultproperties: Optional[Tuple[int, int, str]]  # (start, end, text)
     body_start: int
