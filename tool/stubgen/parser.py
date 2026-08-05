@@ -267,7 +267,7 @@ class Parser:
 
         `region` is the tokens before a name: a run of modifier idents followed
         by exactly one type-reference (IDENT, possibly dotted, possibly a
-        generic like array<...> / delegate<...> / Class<...>). Returns the
+        generic like array<...> / delegate<...> / Class<...> / map{...}). Returns the
         index of the type's first token.
         """
         if not region:
@@ -295,6 +295,22 @@ class Parser:
                             m -= 1
                         cand = m if m >= 0 else k
             return cand if cand is not None else 0
+        if last.kind == "op" and last.text == "}":
+            # map{...} generic: scan backwards from the closing `}`, find the matching
+            # outermost `{`, then step to the base ident before it (should be "map")
+            depth = 0
+            for k in range(len(region) - 1, -1, -1):
+                t = region[k]
+                if t.kind == "op" and t.text == "}":
+                    depth += 1
+                elif t.kind == "op" and t.text == "{":
+                    depth -= 1
+                    if depth < 0:  # outermost '{'
+                        m = k - 1
+                        while m >= 0 and region[m].kind != "ident":
+                            m -= 1
+                        return m if m >= 0 else k
+            return 0
         if last.kind == "ident":
             i = len(region) - 1
             if i - 1 >= 0 and region[i - 1].kind == "op" and region[i - 1].text == ".":
@@ -382,10 +398,20 @@ class Parser:
         if not toks:
             raise UcParseError(0, "empty declaration")
         # first name = first ident followed by , ; [ = or end-of-run
+        # But we must skip identifiers that are inside generics (<...> or {...})
         name_idx: Optional[int] = None
+        generic_depth = 0
         for i, t in enumerate(toks):
+            if t.kind == "op":
+                if t.text in ("<", "{"):
+                    generic_depth += 1
+                elif t.text in (">", "}"):
+                    generic_depth = max(0, generic_depth - 1)
+                continue
             if t.kind != "ident":
                 continue
+            if generic_depth > 0:
+                continue  # Inside a generic, not a variable name
             nxt = None
             for u in toks[i + 1 :]:
                 if u.kind not in ("comment", "newline"):
