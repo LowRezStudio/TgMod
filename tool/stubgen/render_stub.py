@@ -42,28 +42,45 @@ def _params_str(fn: FunctionDecl) -> str:
 
 def _fn_signature(fn: FunctionDecl) -> str:
     """Return the function signature (through closing ')') without body."""
-    mods = list(fn.modifiers)
-    # Handle native(XX) and operator(XX) modifiers
-    if fn.native_index is not None:
-        # Replace native in mods with native(XX)
-        mods = [m for m in mods if m != "native"]
-        mods.insert(0, f"native({fn.native_index})")
-    if fn.operator_kind is not None and fn.operator_priority is not None:
-        # Replace operator/preoperator/postoperator in mods with operator(XX)
-        mods = [m for m in mods if m not in ("operator", "preoperator", "postoperator")]
-        mods.insert(0, f"{fn.operator_kind}({fn.operator_priority})")
-    elif fn.operator_kind is not None:
-        mods = [m for m in mods if m not in ("operator", "preoperator", "postoperator")]
-        mods.insert(0, fn.operator_kind)
-
+    # Build parts in the correct source order:
+    # 1. native(index) or bare "native"
+    # 2. other modifiers (static, final, etc.) except bare "native"
+    # 3. operator(priority)
+    # 4. operator_kind (preoperator/operator/postoperator) or kind (function/event/delegate)
+    # 5. return_type
+    # 6. name(params)
     bits = []
-    if mods:
-        bits.append(" ".join(mods))
-    if fn.kind:
+
+    # 1. native(index) - comes first in source
+    if fn.native_index is not None:
+        bits.append(f"native({fn.native_index})")
+    elif "native" in fn.modifiers:
+        # Bare "native" keyword (no index)
+        bits.append("native")
+
+    # 2. Other modifiers (excluding bare "native" since we handled it above)
+    other_mods = [m for m in fn.modifiers if m != "native"]
+    if other_mods:
+        bits.append(" ".join(other_mods))
+
+    # 3. operator(priority)
+    if fn.operator_priority is not None:
+        bits.append(f"operator({fn.operator_priority})")
+
+    # 4. operator_kind or kind
+    if fn.operator_kind is not None:
+        if fn.operator_kind != "operator" or fn.operator_priority is None:
+            bits.append(fn.operator_kind)
+    elif fn.kind:
         bits.append(fn.kind)
+
+    # 5. return type
     if fn.return_type:
         bits.append(fn.return_type)
+
+    # 6. name(params)
     bits.append(f"{fn.name}({_params_str(fn)})")
+
     return " ".join(bits)
 
 
