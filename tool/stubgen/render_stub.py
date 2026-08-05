@@ -207,7 +207,7 @@ def _flatten(lines: List[Any]) -> List[str]:
     return result
 
 
-def emit_stub(c: ClassDecl) -> str:
+def emit_stub(c: ClassDecl, dependson: Optional[List[str]] = None) -> str:
     """Emit the full stub source for a class/interface."""
     # Skip placeholder None classes (UE Explorer artifacts)
     if c.name == "None":
@@ -233,6 +233,11 @@ def emit_stub(c: ClassDecl) -> str:
         if mods:
             for mod in mods:
                 lines.append(f"    {mod}")
+
+    # Add dependson modifiers
+    if dependson:
+        lines.append(f"    dependson({', '.join(dependson)})")
+
     lines[-1] += ";"
     lines.append("")
 

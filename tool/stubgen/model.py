@@ -186,6 +186,9 @@ class ClassDecl:
     defaultproperties: Optional[DefaultPropertiesBlock]
     errors: List[ParseError]
     leading_comments: List[str] = field(default_factory=list)
+    # New fields for dependson detection
+    declared_nested_types: List[str] = field(default_factory=list)  # struct/enum names declared in this class
+    referenced_types: List[str] = field(default_factory=list)  # type references used by this class
 
 
 def to_dict(node: Node) -> dict:

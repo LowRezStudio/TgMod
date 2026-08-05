@@ -105,6 +105,9 @@ class Parser:
         self.tokens = tokenize(source)
         self.pos = 0
         self.errors: List[ParseError] = []
+        self.current_class: Optional[ClassDecl] = None
+        # For nested type tracking
+        self.nested_type_stack: List[str] = []  # Stack of class names we're currently inside
 
     # ------------------------------------------------------------------ #
     # token helpers
@@ -302,6 +305,74 @@ class Parser:
             return i
         return 0
 
+    def _extract_type_references(self, type_raw: str) -> List[str]:
+        """Extract type references from a raw type string.
+
+        Handles:
+        - Simple types: "bool", "int", "float", "string", "name", "Vector", "Rotator", etc.
+        - Class/struct/enum references: "MyClass", "MyStruct", "MyEnum"
+        - Dotted references: "OuterClass.InnerStruct", "Package.Class.SubStruct"
+        - Arrays: "array<MyType>", "MyType[10]"
+        - Class references: "class<MyClass>"
+        - Delegates: "delegate<...>"
+
+        Returns a list of base type names (without generics/arrays).
+        """
+        if not type_raw:
+            return []
+
+        refs = []
+
+        # Handle array<MyType> - extract MyType
+        import re
+        # Match array<...> and extract inner type
+        array_matches = re.findall(r'array\s*<\s*([^<>]+(?:\s*<\s*[^<>]+\s*>)*\s*)>', type_raw)
+        for match in array_matches:
+            refs.extend(self._extract_type_references(match.strip()))
+
+        # Handle class<...> - extract inner class
+        class_matches = re.findall(r'class\s*<\s*([^<>]+(?:\s*<\s*[^<>]+\s*>)*\s*)>', type_raw)
+        for match in class_matches:
+            refs.extend(self._extract_type_references(match.strip()))
+
+        # For the remaining, find identifiers that look like type names
+        # Type names typically start with uppercase
+        # Split by non-identifier chars but preserve dots for dotted names
+        # First, replace generics with placeholder
+        cleaned = re.sub(r'<[^<>]*>', '', type_raw)  # Remove simple generics
+        # Remove array brackets
+        cleaned = re.sub(r'\[\s*\d*\s*\]', '', cleaned)
+        # Split by non-ident characters except dots
+        parts = re.split(r'[^\w.]+', cleaned)
+
+        for part in parts:
+            part = part.strip('.')
+            if not part:
+                continue
+            # Check if it looks like a type (starts with uppercase, or is a known primitive)
+            # Primitives: bool, byte, int, float, double, string, name, object, class, delegate, interface,
+            # array, vector, rotator, etc.
+            primitives = {"bool", "byte", "int", "float", "double", "string", "name",
+                         "object", "class", "delegate", "interface", "array",
+                         "vector", "rotator", "plane", "quat", "color", "linearcolor",
+                         "guid", "timespan", "datetime", "int64", "uint64", "uint32",
+                         "uint16", "int8", "uint8", "int16", "int32", "int64"}
+            if part.lower() in primitives:
+                continue
+            if part[0].isupper() or part[0] == '_':  # Type names typically start with uppercase
+                refs.append(part)
+
+        return refs
+
+    def _record_type_reference(self, type_raw: str) -> None:
+        """Record type references from a type string in the current class."""
+        if not self.current_class:
+            return
+        refs = self._extract_type_references(type_raw)
+        for ref in refs:
+            if ref not in self.current_class.referenced_types:
+                self.current_class.referenced_types.append(ref)
+
     def _parse_type_names(self, toks: List[Tok]) -> Tuple[List[str], str, List[VarDecl]]:
         """Parse `modifiers type name, name...` (used by var and local).
 
@@ -330,6 +401,9 @@ class Parser:
         ts = self._type_start(region)
         mods = [t.text for t in region[:ts] if t.kind == "ident"]
         type_raw = self._raw_toks(region[ts:]).strip()
+
+        # Record type reference
+        self._record_type_reference(type_raw)
 
         names: List[VarDecl] = []
         i = name_idx
@@ -433,6 +507,11 @@ class Parser:
         close = self._expect("op", "}")
         if self._is_sig("op", ";"):
             self._advance_sig()
+
+        # Record nested type declaration in current class
+        if self.current_class and name:
+            self.current_class.declared_nested_types.append(name)
+
         return EnumDecl(
             line=start.line, col=start.col, name=name or "", modifiers=mods,
             members=members, body_start=body_start, body_end=close.line,
@@ -505,6 +584,11 @@ class Parser:
         close = self._expect("op", "}")
         if self._is_sig("op", ";"):
             self._advance_sig()
+
+        # Record nested type declaration in current class
+        if self.current_class and name:
+            self.current_class.declared_nested_types.append(name)
+
         return StructDecl(
             line=start.line, col=start.col, name=name or "", modifiers=mods, extends=extends,
             members=members, structdefaultproperties=sdp, body_start=body_start,
@@ -820,6 +904,8 @@ class Parser:
                     ts = self._type_start(type_part)
                     if ts < len(type_part):
                         return_type = self._raw_toks(type_part[ts:]).strip()
+                        # Record return type reference
+                        self._record_type_reference(return_type)
                     # any idents between kind and the type are modifiers (rare)
                     mods += [t.text for t in type_part[:ts] if t.kind == "ident"]
             else:
@@ -919,6 +1005,8 @@ class Parser:
             ts = self._type_start(rest)
             if ts < len(rest):
                 ptype = self._raw_toks(rest[ts:]).strip()
+                # Record parameter type reference
+                self._record_type_reference(ptype)
         # fixed-size array dim after the name, e.g. `name TrackControllerName[10]`
         dim = None
         k = name_idx + 1
@@ -1089,6 +1177,8 @@ class Parser:
 
     def parse(self) -> ClassDecl:
         header = self._parse_header()
+        self.current_class = header
+        self.nested_type_stack = [header.name]
         members: List[Any] = []
         while self.peek().kind != "eof":
             try:

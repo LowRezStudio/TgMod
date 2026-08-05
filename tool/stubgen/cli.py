@@ -19,7 +19,7 @@ import re
 import sys
 from collections import deque
 from dataclasses import asdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from .model import (
     ClassDecl,
@@ -59,6 +59,52 @@ def iter_uc_files(root: str):
         for fn in sorted(os.listdir(classes_dir)):
             if fn.endswith(".uc"):
                 yield pkg, os.path.join(classes_dir, fn)
+
+
+def compute_dependson(class_map: Dict[str, ClassDecl], package: str) -> Dict[str, List[str]]:
+    """Compute dependson targets for each class in a package.
+
+    For each class, find nested type references (structs/enums) that are declared
+    in other classes in the same package, excluding the class itself and its parent.
+
+    Returns a dict mapping class name -> list of dependson targets (class names).
+    """
+    # Build map of nested type -> declaring class (for this package only)
+    nested_type_to_class: Dict[str, str] = {}
+    for class_name, c in class_map.items():
+        for nested in c.declared_nested_types:
+            # Key can be bare name or ClassName.NestedName
+            nested_type_to_class[nested] = class_name
+            nested_type_to_class[f"{class_name}.{nested}"] = class_name
+
+    dependson_map: Dict[str, List[str]] = {}
+
+    for class_name, c in class_map.items():
+        if c.kind == "interface":
+            continue  # interfaces don't have dependson
+
+        targets = set()
+        parent_class = c.extends.split(".")[-1] if c.extends else None
+
+        for ref in c.referenced_types:
+            # Check bare reference
+            if ref in nested_type_to_class:
+                declaring_class = nested_type_to_class[ref]
+                if declaring_class != class_name and declaring_class != parent_class:
+                    targets.add(declaring_class)
+            # Check dotted reference (ClassName.NestedType)
+            elif "." in ref:
+                parts = ref.split(".")
+                if len(parts) == 2:
+                    outer, inner = parts
+                    if outer in class_map and inner in class_map[outer].declared_nested_types:
+                        if outer != class_name and outer != parent_class:
+                            targets.add(outer)
+
+        if targets:
+            dependson_map[class_name] = sorted(targets)
+
+    return dependson_map
 
 
 def parse_file(path: str, package: str = "") -> ClassDecl:
@@ -218,6 +264,39 @@ def cmd_dumptree(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_report_dependson(args: argparse.Namespace) -> int:
+    """Report dependson analysis for classes in a package."""
+    root = args.root
+    limit = args.limit or 0
+    n = 0
+
+    # Build path map by package
+    pkg_to_files = {}
+    for pkg, path in iter_uc_files(root):
+        if args.only and pkg != args.only:
+            continue
+        pkg_to_files.setdefault(pkg, []).append(path)
+
+    for pkg in sorted(pkg_to_files.keys()):
+        if limit and n >= limit:
+            break
+        # First pass: parse all files in package to build class map
+        class_map: Dict[str, ClassDecl] = {}
+        for path in pkg_to_files[pkg]:
+            c = parse_file(path, package=pkg)
+            class_map[c.name] = c
+        # Compute dependson for this package
+        dependson_map = compute_dependson(class_map, pkg)
+        # Report
+        if dependson_map:
+            print(f"\n=== Package: {pkg} ===")
+            for class_name, targets in sorted(dependson_map.items()):
+                print(f"  {class_name}: dependson({', '.join(targets)})")
+        n += len(pkg_to_files[pkg])
+
+    return 0
+
+
 def _resolve_output_dir(args: argparse.Namespace, package: str) -> str:
     """Resolve the output directory for a package."""
     if args.out:
@@ -361,7 +440,7 @@ def _write_editpackages_ini(order: List[str], out_path: str) -> None:
     print(f"wrote {out_path}")
 
 
-def _write_stub_file(c: ClassDecl, out_dir: str, dry_run: bool) -> None:
+def _write_stub_file(c: ClassDecl, out_dir: str, dry_run: bool, dependson: Optional[List[str]] = None) -> None:
     """Write a single stub file."""
     # Skip placeholder None classes (UE Explorer artifacts)
     if c.name == "None":
@@ -369,7 +448,7 @@ def _write_stub_file(c: ClassDecl, out_dir: str, dry_run: bool) -> None:
     os.makedirs(out_dir, exist_ok=True)
     stem = c.filename[:-3] if c.filename.endswith(".uc") else c.filename
     out_path = os.path.join(out_dir, stem + ".uc")
-    stub_src = emit_stub(c)
+    stub_src = emit_stub(c, dependson)
     if not stub_src:
         return
     if dry_run:
@@ -420,12 +499,21 @@ def cmd_stub(args: argparse.Namespace) -> int:
                 if pkg not in pkg_to_files:
                     continue
                 out_dir = _prepare_output_dir(args, pkg)
+                # First pass: parse all files in package to build class map
+                class_map: Dict[str, ClassDecl] = {}
+                for path in pkg_to_files[pkg]:
+                    c = parse_file(path, package=pkg)
+                    class_map[c.name] = c
+                # Compute dependson for this package
+                dependson_map = compute_dependson(class_map, pkg)
+                # Second pass: write stubs with dependson
                 for path in pkg_to_files[pkg]:
                     if limit and n >= limit:
                         break
                     c = parse_file(path, package=pkg)
                     nerrors += len(c.errors)
-                    _write_stub_file(c, out_dir, dry_run)
+                    dependson = dependson_map.get(c.name, [])
+                    _write_stub_file(c, out_dir, dry_run, dependson)
                     n += 1
                 if limit and n >= limit:
                     break
@@ -437,20 +525,35 @@ def cmd_stub(args: argparse.Namespace) -> int:
             # Original order (alphabetical by package)
             # Need to track which packages we've already prepared
             prepared_pkgs = set()
+            # Build path map by package
+            pkg_to_files = {}
             for pkg, path in iter_uc_files(root):
                 if args.only and pkg != args.only:
                     continue
+                pkg_to_files.setdefault(pkg, []).append(path)
+
+            for pkg in sorted(pkg_to_files.keys()):
                 if limit and n >= limit:
                     break
-                c = parse_file(path, package=pkg)
-                nerrors += len(c.errors)
+                out_dir = _prepare_output_dir(args, pkg) if pkg not in prepared_pkgs else _resolve_output_dir(args, pkg)
                 if pkg not in prepared_pkgs:
-                    out_dir = _prepare_output_dir(args, pkg)
                     prepared_pkgs.add(pkg)
-                else:
-                    out_dir = _resolve_output_dir(args, pkg)
-                _write_stub_file(c, out_dir, dry_run)
-                n += 1
+                # First pass: parse all files in package to build class map
+                class_map: Dict[str, ClassDecl] = {}
+                for path in pkg_to_files[pkg]:
+                    c = parse_file(path, package=pkg)
+                    class_map[c.name] = c
+                # Compute dependson for this package
+                dependson_map = compute_dependson(class_map, pkg)
+                # Second pass: write stubs with dependson
+                for path in pkg_to_files[pkg]:
+                    if limit and n >= limit:
+                        break
+                    c = parse_file(path, package=pkg)
+                    nerrors += len(c.errors)
+                    dependson = dependson_map.get(c.name, [])
+                    _write_stub_file(c, out_dir, dry_run, dependson)
+                    n += 1
 
     action = "would write" if dry_run else "wrote"
     print(f"{action} {n} stub files, {nerrors} parse errors")
@@ -495,6 +598,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     pstub.add_argument("--editpackages-out", default="UDKGame/Config/DefaultEngine.ini", help="path to write EditPackages.ini (default: UDKGame/Config/DefaultEngine.ini)")
     pstub.add_argument("--replace", action="store_true", help="replace (delete+recreate) each package's output directory before writing stubs")
     pstub.set_defaults(func=cmd_stub)
+
+    preport = sub.add_parser("report-dependson", help="report dependson analysis for nested types")
+    preport.add_argument("--root", default=DEFAULT_ROOT, help="exported source root")
+    preport.add_argument("--only", default=None, help="restrict to one package dir")
+    preport.add_argument("--limit", type=int, default=0, help="stop after N files")
+    preport.set_defaults(func=cmd_report_dependson)
 
     return p
 
