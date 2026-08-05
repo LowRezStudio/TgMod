@@ -132,6 +132,9 @@ def _replication_str(r: ReplicationBlock) -> str:
 def _member_stub(m: Any) -> List[str]:
     """Emit a member as stub lines."""
     if isinstance(m, VarGroup):
+        # Skip compiler-generated VfTable_ variables
+        if any(v.name.startswith("VfTable_") for v in m.vars):
+            return []
         return [_var_str(m) + ";"]
     if isinstance(m, ConstDecl):
         return [f"const {m.name} = {m.value};"]
@@ -171,6 +174,10 @@ def _flatten(lines: List[Any]) -> List[str]:
 
 def emit_stub(c: ClassDecl) -> str:
     """Emit the full stub source for a class/interface."""
+    # Skip placeholder None classes (UE Explorer artifacts)
+    if c.name == "None":
+        return ""
+
     kind = "interface" if c.kind == "interface" else "class"
     lines = []
 

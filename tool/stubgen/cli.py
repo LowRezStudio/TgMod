@@ -226,6 +226,17 @@ def _resolve_output_dir(args: argparse.Namespace, package: str) -> str:
     return os.path.join("Development", "Src", package, "Classes")
 
 
+def _prepare_output_dir(args: argparse.Namespace, package: str) -> str:
+    """Resolve output dir and optionally replace it (delete + recreate)."""
+    out_dir = _resolve_output_dir(args, package)
+    if args.replace:
+        import shutil
+        if os.path.exists(out_dir):
+            print(f"  replacing {out_dir}")
+            shutil.rmtree(out_dir)
+    return out_dir
+
+
 def _compute_package_order(root: str) -> List[str]:
     """Compute topological order of non-stock packages based on extends dependencies."""
     packages = [d for d in sorted(os.listdir(root))
@@ -328,7 +339,7 @@ def cmd_stub(args: argparse.Namespace) -> int:
         pkg = args.package or os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(args.file))))
         c = parse_file(args.file, package=pkg)
         nerrors += len(c.errors)
-        out_dir = _resolve_output_dir(args, pkg)
+        out_dir = _prepare_output_dir(args, pkg)
         _write_stub_file(c, out_dir, dry_run)
         n = 1
     else:
@@ -349,12 +360,12 @@ def cmd_stub(args: argparse.Namespace) -> int:
             for pkg in pkg_order:
                 if pkg not in pkg_to_files:
                     continue
+                out_dir = _prepare_output_dir(args, pkg)
                 for path in pkg_to_files[pkg]:
                     if limit and n >= limit:
                         break
                     c = parse_file(path, package=pkg)
                     nerrors += len(c.errors)
-                    out_dir = _resolve_output_dir(args, pkg)
                     _write_stub_file(c, out_dir, dry_run)
                     n += 1
                 if limit and n >= limit:
@@ -365,6 +376,8 @@ def cmd_stub(args: argparse.Namespace) -> int:
                 _write_editpackages_ini(pkg_order, args.editpackages_out)
         else:
             # Original order (alphabetical by package)
+            # Need to track which packages we've already prepared
+            prepared_pkgs = set()
             for pkg, path in iter_uc_files(root):
                 if args.only and pkg != args.only:
                     continue
@@ -372,7 +385,11 @@ def cmd_stub(args: argparse.Namespace) -> int:
                     break
                 c = parse_file(path, package=pkg)
                 nerrors += len(c.errors)
-                out_dir = _resolve_output_dir(args, pkg)
+                if pkg not in prepared_pkgs:
+                    out_dir = _prepare_output_dir(args, pkg)
+                    prepared_pkgs.add(pkg)
+                else:
+                    out_dir = _resolve_output_dir(args, pkg)
                 _write_stub_file(c, out_dir, dry_run)
                 n += 1
 
@@ -417,6 +434,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     pstub.add_argument("--dry-run", action="store_true", help="print what would be written without writing")
     pstub.add_argument("--all", action="store_true", help="process all packages in dependency order and write EditPackages.ini")
     pstub.add_argument("--editpackages-out", default="UDKGame/Config/DefaultEngine.ini", help="path to write EditPackages.ini (default: UDKGame/Config/DefaultEngine.ini)")
+    pstub.add_argument("--replace", action="store_true", help="replace (delete+recreate) each package's output directory before writing stubs")
     pstub.set_defaults(func=cmd_stub)
 
     return p
