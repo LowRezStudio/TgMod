@@ -440,7 +440,7 @@ def _write_editpackages_ini(order: List[str], out_path: str) -> None:
     print(f"wrote {out_path}")
 
 
-def _write_stub_file(c: ClassDecl, out_dir: str, dry_run: bool, dependson: Optional[List[str]] = None) -> None:
+def _write_stub_file(c: ClassDecl, out_dir: str, dry_run: bool, dependson: Optional[List[str]] = None, all_classes: Optional[dict] = None) -> None:
     """Write a single stub file."""
     # Skip placeholder None classes (UE Explorer artifacts)
     if c.name == "None":
@@ -448,7 +448,7 @@ def _write_stub_file(c: ClassDecl, out_dir: str, dry_run: bool, dependson: Optio
     os.makedirs(out_dir, exist_ok=True)
     stem = c.filename[:-3] if c.filename.endswith(".uc") else c.filename
     out_path = os.path.join(out_dir, stem + ".uc")
-    stub_src = emit_stub(c, dependson)
+    stub_src = emit_stub(c, dependson, all_classes)
     if not stub_src:
         return
     if dry_run:
@@ -475,7 +475,16 @@ def cmd_stub(args: argparse.Namespace) -> int:
         c = parse_file(args.file, package=pkg)
         nerrors += len(c.errors)
         out_dir = _prepare_output_dir(args, pkg)
-        _write_stub_file(c, out_dir, dry_run)
+        # For single file, we still want to check parent interface
+        class_map: Dict[str, ClassDecl] = {c.name: c}
+        # Also parse the parent class if it's in the same package
+        if c.extends:
+            parent_name = c.extends.split(".")[-1]
+            parent_path = os.path.join("exported", pkg, "Classes", parent_name + ".uc")
+            if os.path.exists(parent_path):
+                parent_c = parse_file(parent_path, package=pkg)
+                class_map[parent_name] = parent_c
+        _write_stub_file(c, out_dir, dry_run, [], class_map)
         n = 1
     else:
         # Directory tree mode
@@ -513,7 +522,7 @@ def cmd_stub(args: argparse.Namespace) -> int:
                     c = parse_file(path, package=pkg)
                     nerrors += len(c.errors)
                     dependson = dependson_map.get(c.name, [])
-                    _write_stub_file(c, out_dir, dry_run, dependson)
+                    _write_stub_file(c, out_dir, dry_run, dependson, class_map)
                     n += 1
                 if limit and n >= limit:
                     break
@@ -552,7 +561,7 @@ def cmd_stub(args: argparse.Namespace) -> int:
                     c = parse_file(path, package=pkg)
                     nerrors += len(c.errors)
                     dependson = dependson_map.get(c.name, [])
-                    _write_stub_file(c, out_dir, dry_run, dependson)
+                    _write_stub_file(c, out_dir, dry_run, dependson, class_map)
                     n += 1
 
     action = "would write" if dry_run else "wrote"

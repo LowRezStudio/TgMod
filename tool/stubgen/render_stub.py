@@ -30,7 +30,16 @@ def _params_str(fn: FunctionDecl) -> str:
         bits = []
         if p.modifiers:
             bits.append(" ".join(p.modifiers) + " ")
-        bits.append(p.type)
+        # Remove editinline from array types in parameter types
+        param_type = p.type
+        if param_type:
+            # Replace array<editinline Type> with array<Type>
+            import re
+            param_type = re.sub(r'array\s*<\s*editinline\s+', 'array<', param_type)
+            param_type = re.sub(r'array\s*<\s*editconst\s+', 'array<', param_type)
+            param_type = re.sub(r'array\s*<\s*editinline\s+editconst\s+', 'array<', param_type)
+            param_type = re.sub(r'array\s*<\s*editconst\s+editinline\s+', 'array<', param_type)
+        bits.append(param_type)
         bits.append(" " + p.name)
         if p.dim is not None:
             bits.append(f"[{p.dim}]")
@@ -38,6 +47,17 @@ def _params_str(fn: FunctionDecl) -> str:
             bits.append("=" + p.default)
         parts.append("".join(bits))
     return ", ".join(parts)
+
+
+def _clean_type(t: str) -> str:
+    """Remove editinline/editconst from array generics in type strings."""
+    import re
+    # Replace array<editinline Type> with array<Type>
+    t = re.sub(r'array\s*<\s*editinline\s+', 'array<', t)
+    t = re.sub(r'array\s*<\s*editconst\s+', 'array<', t)
+    t = re.sub(r'array\s*<\s*editinline\s+editconst\s+', 'array<', t)
+    t = re.sub(r'array\s*<\s*editconst\s+editinline\s+', 'array<', t)
+    return t
 
 
 def _fn_signature(fn: FunctionDecl) -> str:
@@ -60,6 +80,17 @@ def _fn_signature(fn: FunctionDecl) -> str:
 
     # 2. Other modifiers (excluding bare "native" since we handled it above)
     other_mods = [m for m in fn.modifiers if m != "native"]
+    # Interfaces can't have final, static, private, protected, public on functions
+    # EXCEPT: native functions with an index (native(N)) must be static final
+    if fn.operator_kind is None and fn.kind not in ("operator", "preoperator", "postoperator"):
+        # Check if this function is in an interface
+        # We don't have access to the parent class here, but we can strip known invalid modifiers for interfaces
+        invalid_interface_mods = {"final", "static", "private", "protected", "public"}
+        # But native functions with index MUST keep static final
+        if fn.native_index is not None:
+            # Keep static and final for indexed native functions
+            invalid_interface_mods = {"private", "protected", "public"}
+        other_mods = [m for m in other_mods if m not in invalid_interface_mods]
     if other_mods:
         bits.append(" ".join(other_mods))
 
@@ -76,7 +107,7 @@ def _fn_signature(fn: FunctionDecl) -> str:
 
     # 5. return type
     if fn.return_type:
-        bits.append(fn.return_type)
+        bits.append(_clean_type(fn.return_type))
 
     # 6. name(params)
     bits.append(f"{fn.name}({_params_str(fn)})")
@@ -90,7 +121,7 @@ def _var_str(vg: VarGroup) -> str:
         bits.append(vg.category)
     if vg.modifiers:
         bits.append(" ".join(vg.modifiers))
-    bits.append(vg.type)
+    bits.append(_clean_type(vg.type))
     names = []
     for v in vg.vars:
         s = v.name
@@ -138,19 +169,10 @@ def _struct_str(s: StructDecl) -> str:
 
 
 def _state_str(st: StateDecl) -> str:
-    # For stubs, states are simplified to just "state StateName { ... }"
-    # No auto, category, modifiers, or ignores
+    # For stubs, states are simplified to just "state StateName { }" (no body)
     auto = "auto " if st.is_auto else ""
     head = f"{auto}state {st.name}"
-    lines = [head + " {"]
-    for sub in st.members:
-        if isinstance(sub, FunctionDecl):
-            # Strip function bodies in states too
-            lines.append(f"    {_fn_signature(sub)} {{ }}")
-        elif isinstance(sub, RawStatement):
-            lines.append(f"    {sub.text}")
-    lines.append("}")
-    return "\n".join(lines)
+    return head + " {}"
 
 
 def _replication_str(r: ReplicationBlock) -> str:
@@ -159,7 +181,11 @@ def _replication_str(r: ReplicationBlock) -> str:
         rel = f"{rule.reliability} " if rule.reliability else ""
         cond = f"if({rule.condition}) " if rule.condition else ""
         props = ", ".join(rule.props)
-        lines.append(f"    {rel}{cond}{props}")
+        # Fix ROLE_ constants to use ENetRole. prefix
+        import re
+        cond = re.sub(r'int\((RemoteRole|Role)\)\s*==\s*int\((ROLE_\w+)\)', r'int(\1) == int(ENetRole.\2)', cond)
+        # Add semicolon at end of replication rule
+        lines.append(f"    {rel}{cond}{props};")
     lines.append("}")
     return "\n".join(lines)
 
@@ -207,7 +233,7 @@ def _flatten(lines: List[Any]) -> List[str]:
     return result
 
 
-def emit_stub(c: ClassDecl, dependson: Optional[List[str]] = None) -> str:
+def emit_stub(c: ClassDecl, dependson: Optional[List[str]] = None, all_classes: Optional[dict] = None) -> str:
     """Emit the full stub source for a class/interface."""
     # Skip placeholder None classes (UE Explorer artifacts)
     if c.name == "None":
@@ -215,7 +241,15 @@ def emit_stub(c: ClassDecl, dependson: Optional[List[str]] = None) -> str:
 
     # Fix UE Explorer decompilation error: classes named Interface_* are actually interfaces
     # The decompiler incorrectly outputs them as "class Interface_..." instead of "interface Interface_..."
-    kind = "interface" if (c.kind == "interface" or c.name.startswith("Interface_")) else "class"
+    # Also: if a class extends an interface, it must be an interface
+    is_interface = c.kind == "interface" or c.name.startswith("Interface_")
+    if not is_interface and c.extends:
+        # Check if the parent is an interface
+        parent_name = c.extends.split(".")[-1]
+        if all_classes and parent_name in all_classes:
+            if all_classes[parent_name].kind == "interface" or parent_name.startswith("Interface_"):
+                is_interface = True
+    kind = "interface" if is_interface else "class"
     lines = []
 
     # Class header
