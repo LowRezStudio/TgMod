@@ -119,9 +119,12 @@ def _enum_str(e: EnumDecl) -> str:
 
 
 def _struct_str(s: StructDecl) -> str:
-    # For stubs, native structs are emitted as normal structs without modifiers
-    # and with a trailing semicolon after the closing brace
-    head = f"struct {s.name}"
+    # For stubs, preserve native/transient modifiers but strip atomicwhencooked/immutablewhencooked
+    mods_to_keep = [m for m in s.modifiers if m in ("native", "transient")]
+    head = "struct"
+    if mods_to_keep:
+        head += " " + " ".join(mods_to_keep)
+    head += f" {s.name}"
     if s.extends:
         head += f" extends {s.extends}"
     lines = [head + " {"]

@@ -447,7 +447,7 @@ class Parser:
             raise UcParseError(start.line, "struct without '{'")
 
         # Known struct modifiers that come before the name
-        STRUCT_MODIFIERS = {"atomic", "immutable", "native", "const", "static", "export", "noexport", "transient"}
+        STRUCT_MODIFIERS = {"atomic", "immutable", "native", "const", "static", "export", "noexport", "transient", "atomicwhencooked", "immutablewhencooked"}
 
         # Find struct name (first non-modifier ident after 'struct')
         # Format: struct [modifiers...] Name [extends Base] ;
@@ -824,8 +824,9 @@ class Parser:
                     mods += [t.text for t in type_part[:ts] if t.kind == "ident"]
             else:
                 mods = [t.text for t in region if t.kind == "ident"]
-            # Non-operator functions don't have these
-            native_index = None
+            # Non-operator functions don't have operator_kind/operator_priority, but native_index may have been set
+            if native_index is None:
+                native_index = None
             operator_kind = None
             operator_priority = None
 
