@@ -222,12 +222,16 @@ def emit_stub(c: ClassDecl) -> str:
         header += f" extends {c.extends}"
     if c.within:
         header += f" within {c.within}"
+    lines.append(header)
+
+    # Modifiers on separate lines
     if c.modifiers:
         # For interfaces, strip "abstract" keyword
         mods = [m for m in c.modifiers if not (kind == "interface" and m == "abstract")]
         if mods:
-            header += " " + " ".join(mods)
-    lines.append(header + ";")
+            for mod in mods:
+                lines.append(f"    {mod}")
+    lines[-1] += ";"
     lines.append("")
 
     # Leading comments on class
