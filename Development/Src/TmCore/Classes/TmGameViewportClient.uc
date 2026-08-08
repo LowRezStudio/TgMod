@@ -1,10 +1,13 @@
-class TmGameViewportClient extends TgGameViewportClient within Engine;
+class TmGameViewportClient extends TgGameViewportClient within Engine
+    config(TmConfig);
 
 var TgPlayerController PC;
 var TmProxyActor PA;
 
 var float StartTime;
 var bool bHasStarted;
+
+var config Guid PlayerGuid;
 
 function PostRender(Canvas Canvas)
 {
@@ -49,6 +52,11 @@ event bool Init(out string OutError)
 	}
 
     SetConsoleTarget(0);
+
+    if(PlayerGuid.A == 0) {
+        PlayerGuid = CreateGuid();
+        SaveConfig();
+    }
 
     return super.Init(OutError);
 }

@@ -19,6 +19,25 @@ static function TmProxyActor SetupProxy(TgPlayerController PC) {
     }
 }
 
+static function int ToInt(coerce int strNb) {
+    return strNb;
+}
+
+static function string DecodeURLParam(string encodedParam)
+{
+    local string decodedParam;
+    decodedParam = encodedParam;
+    
+    decodedParam = Repl(decodedParam, "%spc", " ");
+    decodedParam = Repl(decodedParam, "%qtm", "?");
+    decodedParam = Repl(decodedParam, "%amp", "&");
+    decodedParam = Repl(decodedParam, "%eql", "=");
+    decodedParam = Repl(decodedParam, "%hsh", "#");
+    decodedParam = Repl(decodedParam, "%prc", "%");
+    
+    return decodedParam;
+}
+
 static function SetupPRI(TgGame Game, TgRepInfo_Player PRI, int Address, string PlayerName, int TaskForce, int MountId) {
     local TgPlayerController PC;
     PC = TgPlayerController(PRI.Owner);
