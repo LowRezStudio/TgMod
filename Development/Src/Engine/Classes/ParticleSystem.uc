@@ -216,6 +216,52 @@ struct native LODSoloTrack
 {
 	var transient array<byte>	SoloEnableSetting;
 };
+
+struct ParticleChannelContainer
+{
+    var bool bInitialized;
+    var(Channel) bool Default;
+    var(Channel) bool Friendly;
+    var(Channel) bool Enemy;
+    var(Channel) bool LocalOwner;
+    var bool Channel5;
+    var bool Channel6;
+    var bool Channel7;
+    var bool Channel8;
+    var(Filter) bool VerticalTargeter;
+    var bool Filter2;
+    var(Filter) bool NotLocalOwner;
+    var(Filter) bool CustomFilter1;
+    var(Filter) bool CustomFilter2;
+    var(Filter) bool CustomFilter3;
+    var(Filter) bool CustomFilter4;
+    var(Filter) bool CustomFilter5;
+    var(Filter) bool CustomFilter6;
+    var(Filter) bool CustomFilter7;
+
+    structdefaultproperties
+    {
+        bInitialized=true
+        Default=true
+        Friendly=false
+        Enemy=false
+        LocalOwner=false
+        Channel5=false
+        Channel6=false
+        Channel7=false
+        Channel8=false
+        VerticalTargeter=false
+        Filter2=false
+        NotLocalOwner=false
+        CustomFilter1=false
+        CustomFilter2=false
+        CustomFilter3=false
+        CustomFilter4=false
+        CustomFilter5=false
+        CustomFilter6=false
+        CustomFilter7=false
+    }
+};
 var transient array<LODSoloTrack>	SoloTracking;
 
 //

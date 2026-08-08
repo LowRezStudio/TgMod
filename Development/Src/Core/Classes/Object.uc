@@ -570,6 +570,32 @@ enum EDebugBreakType
 	DEBUGGER_Both,
 };
 
+
+
+struct dword
+{
+    var() native int A;
+};
+
+struct IpAddr
+{
+    var int AddrA;
+    var int AddrB;
+    var int AddrC;
+    var int AddrD;
+    var int Port;
+
+    structdefaultproperties
+    {
+        AddrA=0
+        AddrB=0
+        AddrC=0
+        AddrD=0
+        Port=0
+    }
+};
+
+
 //=============================================================================
 // Basic native operators and functions.
 

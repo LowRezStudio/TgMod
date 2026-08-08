@@ -1,0 +1,1 @@
+interface DelayQueueInterface extends Interface;

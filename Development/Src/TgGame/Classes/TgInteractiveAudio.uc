@@ -1,0 +1,1 @@
+interface TgInteractiveAudio extends Interface;

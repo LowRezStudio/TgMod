@@ -269,6 +269,12 @@ struct native GameTypePrefix
 	var array<string> ForcedObjects;
 };
 
+enum PIEPawnMeshTypes
+{
+    PIEMESH_UseMeshID,              // 0
+    PIEMESH_MAX                     // 1
+};
+
 /** The default game type to use on a map */
 var config string					DefaultGameType;
 /** Used for loading appropriate game type if non-specified in URL */
