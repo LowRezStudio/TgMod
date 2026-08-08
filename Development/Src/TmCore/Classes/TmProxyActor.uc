@@ -4,9 +4,9 @@ simulated reliable client function ClientAddCheats() {
     local TgPlayerController PC;
     PC = TgPlayerController(Owner);
 
-    PC.CheatClass = Class'TgGame.TgBattleCheatManager';
+    PC.CheatClass = Class'TmCheatManager';
     if(PC.CheatManager == none) {
-        PC.CheatManager = new (PC) Class'TgGame.TgBattleCheatManager';
+        PC.CheatManager = new (PC) Class'TmCheatManager';
         if(PC.CheatManager != none) {
             PC.CheatManager.InitCheatManager();
             `LogInfo('TmProxyActor', (("CheatManager successfully created and initialized : " @ string(PC.CheatManager.Name)) @ ":") @ string(PC.CheatManager.Outer.Name));                
@@ -24,9 +24,9 @@ function ServerAddCheats() {
 }
 
 simulated reliable client function ClientConsoleCommand(string Command, optional bool WriteToLog) {
-    local TgBattleCheatManager CM;
+    local TmCheatManager CM;
 
-    CM = TgBattleCheatManager(TgPlayerController(Owner).CheatManager);
+    CM = TmCheatManager(TgPlayerController(Owner).CheatManager);
     if (CM != none) {
         CM.Outer.ConsoleCommand(Command, WriteToLog);
     } else {

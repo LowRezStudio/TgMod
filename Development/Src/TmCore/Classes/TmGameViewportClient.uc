@@ -85,8 +85,8 @@ public function findPCAndAttachCM() {
     if (PC.CheatManager == None) {
         PA = `UTILS.SetupProxy(PC);
         
-        PC.CheatClass = class'TgBattleCheatManager';
-        PC.CheatManager = new(PC) class'TgBattleCheatManager';
+        PC.CheatClass = class'TmCheatManager';
+        PC.CheatManager = new(PC) class'TmCheatManager';
         if (PC.CheatManager != None) {
             PC.CheatManager.InitCheatManager();
 			PC.ConsoleCommand("changetaskforce 1");

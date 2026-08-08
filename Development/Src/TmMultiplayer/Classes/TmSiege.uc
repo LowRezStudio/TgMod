@@ -1,4 +1,4 @@
-class Siege extends TgGame_Paladins_Siege;
+class TmSiege extends TgGame_Paladins_Siege;
 
 var transient TgGame TgG;
 var transient TgRepInfo_Game GRI;
