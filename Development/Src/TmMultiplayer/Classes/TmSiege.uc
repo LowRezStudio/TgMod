@@ -45,23 +45,21 @@ public event PostLogin(PlayerController NewPlayer)
     ProxyActor.ServerAddCheats();
     
     TgPC.CheatClass = Class'TgGame.TgBattleCheatManager';
-    // End:0x34A
     if(TgPC.CheatManager == none)
     {
         TgPC.CheatManager = new (TgPC) Class'TgGame.TgBattleCheatManager';
-        // End:0x314
         if(TgPC.CheatManager != none)
         {
             TgPC.CheatManager.InitCheatManager();
-            LogInternal((("TempestProxyActor: CheatManager successfully created and initialized : " @ string(TgPC.CheatManager.Name)) @ ":") @ string(TgPC.CheatManager.Outer.Name));            
+            `log((("TempestProxyActor: CheatManager successfully created and initialized : " @ string(TgPC.CheatManager.Name)) @ ":") @ string(TgPC.CheatManager.Outer.Name));            
         }
         else
         {
-            LogInternal("TempestProxyActor: Failed to create CheatManager!");
+            `log("TempestProxyActor: Failed to create CheatManager!");
         }
     }
 
-    Class'Utils'.static.SetupPRI(TgG, TgRPI, 573885, "beboutom", 1, 0);
+    Class'Utils'.static.SetupPRI(TgG, TgRPI, `UTILS.ToInt(RandRange(100.0, 10000.0)), "beboutom", 1, 0);
     Class'Utils'.static.SpawnPawn(self, TgPC, 2092, 12201, 13171, 15926, 0);
     
     TgP = TgPawn_Character(TgPC.Pawn);
@@ -69,7 +67,6 @@ public event PostLogin(PlayerController NewPlayer)
     TgP.PostPawnSetupServer();
 
     MountDevice = TgDevice_Mount(TgP.GetDeviceByEqPoint(23));
-    // End:0x190
     if(MountDevice != none)
     {
         MountDevice.SetAllowMountServerTimer();
@@ -77,9 +74,7 @@ public event PostLogin(PlayerController NewPlayer)
     }
             
     ProxyActor.ClientConsoleCommand("setreadytoplay");
-
-
-    }
+}
 
 public event PostBeginPlay()
 {

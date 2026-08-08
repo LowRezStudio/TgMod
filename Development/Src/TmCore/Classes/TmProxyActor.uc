@@ -1,18 +1,30 @@
 class TmProxyActor extends Actor;
 
+var TmCheatManager OwnedCheatManager;   // CheatManager this proxy created/bound on its client
+
 simulated reliable client function ClientAddCheats() {
     local TgPlayerController PC;
-    PC = TgPlayerController(Owner);
+    local TmCheatManager CM;
 
-    PC.CheatClass = Class'TmCheatManager';
-    if(PC.CheatManager == none) {
-        PC.CheatManager = new (PC) Class'TmCheatManager';
-        if(PC.CheatManager != none) {
-            PC.CheatManager.InitCheatManager();
-            `LogInfo('TmProxyActor', (("CheatManager successfully created and initialized : " @ string(PC.CheatManager.Name)) @ ":") @ string(PC.CheatManager.Outer.Name));                
-        } else {
-            `LogError('TmProxyActor', "Failed to create CheatManager!");
-        }
+    PC = TgPlayerController(Owner);
+    if (PC == none) {
+        return;
+    }
+
+    CM = TmCheatManager(PC.CheatManager);
+    if (CM == none) {
+        PC.CheatClass = Class'TmCheatManager';
+        CM = new (PC) Class'TmCheatManager';
+        PC.CheatManager = CM;
+    }
+
+    if (CM != none) {
+        CM.InitCheatManager();
+        CM.Proxy = self;
+        OwnedCheatManager = CM;
+        `LogInfo('TmProxyActor', (("CheatManager successfully created and initialized : " @ string(CM.Name)) @ ":") @ string(CM.Outer.Name));
+    } else {
+        `LogError('TmProxyActor', "Failed to create CheatManager!");
     }
 }
 
@@ -21,6 +33,28 @@ function ServerAddCheats() {
         ClientAddCheats();
     }
     ClientAddCheats();
+}
+
+
+// CLIENT -> SERVER
+
+// Dumb way of executing arbitrary commands on the server using one Hi-Rez's whitelisted Server commands
+reliable server function ServerVerifyVehiclePhys(string Command) {
+    local TgPlayerController PC;
+
+    if (Role == ROLE_Authority) {
+        PC = TgPlayerController(Owner);
+        if (PC != none) {
+            PC.ConsoleCommand(Command);
+        }
+    }
+}
+
+// SERVER -> CLIENT
+
+
+simulated reliable client function ClientLog(string message) {
+    `LogInfo('TmProxyActor', message);
 }
 
 simulated reliable client function ClientConsoleCommand(string Command, optional bool WriteToLog) {
@@ -44,6 +78,16 @@ simulated reliable client function ClientTestPrecache(int BotId, int SkinId, int
 
 public simulated reliable client function talkToClient(string message) {
     `LogInfo('TmProxyActor', "The server said to me :" @ message);
+}
+
+function string GetOwnerName() {
+    local TgPlayerController PC;
+
+    PC = TgPlayerController(Owner);
+    if (PC != none && PC.PlayerReplicationInfo != none) {
+        return PC.PlayerReplicationInfo.PlayerName;
+    }
+    return string(Owner);
 }
 
 defaultproperties {
