@@ -1,0 +1,1 @@
+class Siege extends TgGame_Paladins_Siege;

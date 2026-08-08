@@ -1,6 +1,6 @@
 [mod]
-id = "Tempest Mod"
-name = "Tempest Mod (Console + Multiplayer)"
+id = "Tempest Core"
+name = "Tempest Core"
 version = "1.0.0"
 
 [[mod.authors]]
