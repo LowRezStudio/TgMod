@@ -1,6 +1,7 @@
 class TmProxyActor extends Actor;
 
 var TmCheatManager OwnedCheatManager;   // CheatManager this proxy created/bound on its client
+var TgDemoRecSpectator RecPC;
 
 simulated reliable client function ClientAddCheats() {
     local TgPlayerController PC;
@@ -47,6 +48,17 @@ reliable server function ServerVerifyVehiclePhys(string Command) {
         if (PC != none) {
             PC.ConsoleCommand(Command);
         }
+    }
+}
+
+// Same thing
+reliable server function ServerToggleVehicleJets(string command, optional string option) {
+    local TgPlayerController PC;
+
+    PC = TgPlayerController(Owner);
+
+    if (command ~= "help") {
+        PC.ClientMessage("Admin help");
     }
 }
 

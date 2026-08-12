@@ -4,3 +4,4 @@ files:
   "Config/*": "files/ChaosGame/Config/"
   "UDKGame/Script/TmCore.u": "files/ChaosGame/CookedPCConsole/TmCore.upk"
   "UDKGame/Script/TmMultiplayer.u": "files/ChaosGame/CookedPCConsole/TmMultiplayer.upk"
+  "UDKGame/Script/TempestMp.u": "files/ChaosGame/CookedPCConsole/TempestMp.upk"

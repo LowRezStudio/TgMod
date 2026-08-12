@@ -992,6 +992,15 @@ cpptext
 //-----------------------------------------------------------------------------
 // Functions.
 
+// Export UWorldInfo::execIsPlayingTimelapse(FFrame&, void* const)
+native final function bool IsPlayingTimelapse();
+
+// Export UWorldInfo::execIsTimelapsePlayOfTheGame(FFrame&, void* const)
+native final function bool IsTimelapsePlayOfTheGame();
+
+// Export UWorldInfo::execIsRecordingTimelapse(FFrame&, void* const)
+native final function bool IsRecordingTimelapse();
+
 /** ==== NAV MESH PATH CONSTRAINT/GOAL EVALUATOR POOLING ==== */
 /**
  * will go through all the pools for each constraint/evaluator class that has been added so far and reset

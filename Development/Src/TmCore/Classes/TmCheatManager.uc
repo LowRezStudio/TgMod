@@ -2,6 +2,7 @@ class TmCheatManager extends TgBattleCheatManager within TgPlayerController
     config(Game);
 
 var TmProxyActor Proxy;
+var int DumpGfxDepth;
 
 function TmProxyActor GetProxy() {
     local TmProxyActor PA;
@@ -19,8 +20,28 @@ function TmProxyActor GetProxy() {
     return none;
 }
 
-exec function GMCommand(string command) {
+exec function tmc(string command) {
     if (GetProxy() != none) {
         GetProxy().ServerVerifyVehiclePhys(command);
+    }
+}
+
+exec function admin(string command, optional string option) {
+    if (GetProxy() != none) {
+        GetProxy().ServerToggleVehicleJets(command, option);
+    }
+}
+
+exec function TEDBN(string sDeviceName, int nEquipPointId, optional int FireMode = 1)
+{
+    if (GetProxy() != none) {
+        GetProxy().ServerVerifyVehiclePhys("tedbn"@sDeviceName@nEquipPointId@FireMode);
+    }
+}
+
+exec function EDBN(string sDeviceName, int nEquipPointId, optional int FireMode = 1)
+{
+    if (GetProxy() != none) {
+        GetProxy().ServerVerifyVehiclePhys("edbn"@sDeviceName@nEquipPointId@FireMode);
     }
 }
