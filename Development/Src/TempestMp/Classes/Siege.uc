@@ -24,11 +24,28 @@ struct transient ServerParameters {
 var transient array<TmProxyActor> ProxyActors;
 var transient array<IncomingLoginData> IncomingLogins;
 var transient ServerParameters ServerParams;
+var transient class<PlayerController> NextControllerClass;
 
 var transient array<int> ChampionsToPrecache;
 var transient string DesiredChampionName;
 var transient ChampionInfo DesiredChampion;
 var transient LoadoutInfo DesiredLoadout;
+
+function PlayerController SpawnPlayerController(Vector SpawnLocation, Rotator SpawnRotation) {
+    local PlayerController NewPC;
+
+    if (NextControllerClass != none) {
+        NewPC = Spawn(NextControllerClass,,, SpawnLocation, SpawnRotation);
+        NextControllerClass = none;
+        if (TmSpectatorController(NewPC) != none) {
+            NewPC.PlayerReplicationInfo.bOnlySpectator = true;
+            NewPC.PlayerReplicationInfo.bIsSpectator = true;
+            NewPC.PlayerReplicationInfo.bOutOfLives = true;
+        }
+        return NewPC;
+    }
+    return super.SpawnPlayerController(SpawnLocation, SpawnRotation);
+}
 
 function bool IsPlayerReadyToSpawn(TgPlayerController PC) {
       return PC != none && PC.PlayerReplicationInfo != none
@@ -119,6 +136,11 @@ event PreLogin(string Options, string Address, const UniqueNetId UniqueId, bool 
     Data.Team = ParseOption(Options, "team");
     Data.password = ParseOption(Options, "password");
     Data.horse = ParseOption(Options, "horse");
+
+    if (Data.Team ~= "spec" || Data.Team ~= "spectator" || Data.Team ~= "3")
+        NextControllerClass = Class'TmCore.TmSpectatorController';
+    else
+        NextControllerClass = Class'TgGame.TgPlayerController';
 
     BotId = `UTILS.GetChampionByName(Data.ChampionName).BotId;
     if (BotId > 0 && ChampionsToPrecache.Find(BotId) == -1) {
@@ -283,5 +305,25 @@ function SetupPlayer(TmProxyActor ProxyActor, TgPlayerController PC, IncomingLog
 }
 
 function SetupSpectator(TmProxyActor ProxyActor, TgPlayerController PC, IncomingLoginData LoginData) {
-    `LogError('TmMultiplayer', "Not implemented yet");
+    local TmSpectatorController SPC;
+    local TgPawn TargetPawn;
+    local TgPlayerController TargetPC;
+
+    SPC = TmSpectatorController(PC);
+    if (SPC == none)
+        return;
+
+    SPC.ForwardToSpectatingMatch();
+
+    foreach WorldInfo.AllControllers(Class'TgGame.TgPlayerController', TargetPC) {
+        if (TargetPC == PC)
+            continue;
+        TargetPawn = TgPawn(TargetPC.Pawn);
+        if (TargetPawn != none && TargetPawn.IsAliveAndWell())
+            break;
+    }
+    if (TargetPawn != none)
+        SPC.SpectatorSetViewTarget(TargetPawn);
+
+    ProxyActor.ClientConsoleCommand("setreadytoplay");
 }
