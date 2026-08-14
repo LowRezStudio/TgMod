@@ -64,7 +64,6 @@ reliable server function ServerToggleVehicleJets(string command, optional string
 
 // SERVER -> CLIENT
 
-
 simulated reliable client function ClientLog(string message) {
     `LogInfo('TmProxyActor', message);
 }

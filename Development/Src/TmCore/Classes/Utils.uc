@@ -84,11 +84,11 @@ static function string DecodeURLParam(string encodedParam)
     return decodedParam;
 }
 
-static function SetupPRI(TgGame Game, TgRepInfo_Player PRI, int Address, string PlayerName, int TaskForce, int MountId) {
+static function SetupPRI(TgGame Game, TgRepInfo_Player PRI, string PlayerGuid, string PlayerName, int TaskForce, int MountId) {
     local TgPlayerController PC;
     PC = TgPlayerController(PRI.Owner);
 
-    PC.s_nPlayerId = Address;
+    PC.s_nPlayerId = ToInt(PlayerGuid);
     PC.s_qwNetAccessFlags.A = 0xFFFFFFFF;
     PC.s_qwNetAccessFlags.B = 0xFFFFFFFF;
 
@@ -96,7 +96,6 @@ static function SetupPRI(TgGame Game, TgRepInfo_Player PRI, int Address, string 
     PRI.r_nPlayerId = PC.s_nPlayerId;
     PRI.PlayerName = PlayerName;
 
-    PC.m_nVoicePackId = 13450;
     PRI.r_nMountSkinId = MountId;
 
     PRI.SetTaskForceNumber(TaskForce, true);

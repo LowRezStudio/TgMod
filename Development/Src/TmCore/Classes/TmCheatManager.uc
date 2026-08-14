@@ -20,10 +20,14 @@ function TmProxyActor GetProxy() {
     return none;
 }
 
-exec function tmc(string command) {
+exec function tempest(string command) {
     if (GetProxy() != none) {
         GetProxy().ServerVerifyVehiclePhys(command);
     }
+}
+
+exec function tmc(string command) {
+    tempest(command);
 }
 
 exec function admin(string command, optional string option) {
