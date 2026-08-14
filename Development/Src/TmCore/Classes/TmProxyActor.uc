@@ -1,7 +1,6 @@
 class TmProxyActor extends Actor;
 
 var TmCheatManager OwnedCheatManager;   // CheatManager this proxy created/bound on its client
-var TgDemoRecSpectator RecPC;
 
 simulated reliable client function ClientAddCheats() {
     local TgPlayerController PC;
