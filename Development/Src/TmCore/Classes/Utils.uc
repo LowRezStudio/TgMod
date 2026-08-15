@@ -307,6 +307,7 @@ static function array<LoadoutInfo> GetAllLoadouts() {
     local array<LoadoutInfo> List;
 
     AddLoadout(List, 2205, "Dark Stalker", "Power of the Abyss IV", "Sleight of Hand I", "Buying Time I", "Elusive IV", "Seething Hatred II");  // Androxus
+    AddLoadout(List, 2404, "Battering Ram", "Heavy Metal IV", "Percussion IV", "Trebuchet I", "Gate Crasher IV", "Watchtower I");               // Ash
     AddLoadout(List, 2073, "Tinkerin", "Healing Station IV", "Bowling Ball IV", "Failsafe II", "Double Time I", "Field Deploy I");              // Barik
     AddLoadout(List, 2281, "Chain Reaction", "Air Blast II", "Backdraft II", "King's New Cloak II", "Royal Decree IV", "King's Court II");      // Bomb King
     AddLoadout(List, 2147, "Bounce House", "Leg Day IV", "Stomping Ground II", "Seismic Wave IV", "Rapid Sustain I", "Giga Siphon I");          // Buck
@@ -316,17 +317,26 @@ static function array<LoadoutInfo> GetAllLoadouts() {
     AddLoadout(List, 2071, "Scorch", "Hot Pursuit IV", "Incinerate IV", "Heat Transfer I", "Last Stand II", "Launch I");                        // Fernando
     AddLoadout(List, 2093, "Totemic Ward", "Gale IV", "Shamanic Might I", "Outreach IV", "Crackle II", "Astral Traveler I");                    // Grohk
     AddLoadout(List, 2254, "Ferocity", "Verdant Expanse IV", "Gentle Breeze IV", "Adrenaline I", "Vine Grasp I", "Over Growth II");             // Grover
+    AddLoadout(List, 2348, "Mothers Grace", "Geomancer IV", "Steadfast II", "Shear I", "Lodestone I", "Stone Bulwark IV");                      // Inara
+    AddLoadout(List, 2431, "Luminary", "Star Seeker IV", "Space Jam IV", "Relativity II", "Lightyears I", "Heavenly Pull I");                   // Jenos
     AddLoadout(List, 2249, "Steady Aim", "Prodigy IV", "Beam Me Up IV", "Open Season I", "Quick Scope II", "True Grit I");                      // Kinessa
     AddLoadout(List, 2362, "Death Hastens", "Warrants Out IV", "Requip II", "Wicked Don't Rest IV", "Conditioned I", "Compel I");               // Lex
+    AddLoadout(List, 2417, "Eminence", "Heraldry IV", "Manifest Destiny II", "Highborn II", "Superiority I", "Inheritance III");                // Lian
     AddLoadout(List, 2338, "Cat Burglar", "Street Cred II", "Chase IV", "Scamper IV", "Featherlite I", "Walk it Off I");                        // Maeve
     AddLoadout(List, 2288, "Pluck", "Rampage IV", "Strongarm II", "Surf IV", "Salvage I", "Ebb and Flow I");                                    // Makoa
-    AddLoadout(List, 2303, "Ripened Gourd", "Possession IV", "Swift Spirits IV", "Eerie Presence II", "Ritual Magic I", "Lighter Gourd I");     // Mal'Damba
-    AddLoadout(List, 2056, "Catalyst", "Moxie III", "Acumen III", "Side Tanks II", "Escape Artist III", "Smithereens I");                       // Pip
+    AddLoadout(List, 2303, "Ripened Gourd", "Possession IV", "Swift Spirits IV", "Fleeting II", "Ritual Magic I", "Lighter Gourd I");           // Mal'Damba
+    AddLoadout(List, 2056, "Catalyst", "Moxie III", "Acumen III", "Side Tanks II", "Gift Giver II", "Smithereens II");                          // Pip
     AddLoadout(List, 2149, "Aerial Assault", "Fuel Reserves IV", "Slow Dampener II", "Crystal Capacitor IV", "Refraction I", "E.M.P. I");       // Ruckus
-    AddLoadout(List, 2057, "Surprise Attack", "Victory Rush IV", "Poisoner II", "Ninja IV", "Dissipate I", "Nimble Fingers I");                 // Skye
+    AddLoadout(List, 2372, "Mortal Reach", "Veil IV", "Blood Pact II", "Dark Sight I", "Spirit Leech I", "Umbral Gait IV");                     // Seris
+    AddLoadout(List, 2307, "Desert Shadow", "Wanderlust IV", "Swagger I", "Run Them Down I", "Mirage II", "Run Like the Wind IV");              // Shalin
+    AddLoadout(List, 2057, "Surprise Attack", "Confound III", "Specter III", "Ninja II", "Dissipate III", "Quick Smoker I");                    // Skye
+    AddLoadout(List, 2438, "Crack Shot", "Bushwack III", "Dexterous III", "Tactical Retreat III", "Relentless II", "Cooled Mags I");            // Strix
+    AddLoadout(List, 2322, "Field Study", "Winddancer III", "Glyph of Health II", "Eldritch Speed IV", "Timeshaper II", "Scribe's Wit I");      // Torvald
     AddLoadout(List, 2314, "Mercy Kill", "Locked and Loaded II", "Bandolier IV", "Tracker II", "Ranger I", "Incensed III");                     // Tyra
-    AddLoadout(List, 2285, "Cardio", "Scramble IV", "Compensator II", "Firing Stance IV", "Flak Jacket I", "Second Wind I");                    // Viktor
-    AddLoadout(List, 2267, "Lifelike", "Spring Bloom IV", "Spring Forward III", "Rewind I", "Shuffle III", "Efficiency I");                     // Ying
+    AddLoadout(List, 2285, "Firefight", "Scramble IV", "Compensator II", "Firing Stance IV", "Flak Jacket I", "Second Wind I");                 // Viktor
+    AddLoadout(List, 2393, "Blastflower", "Hummingbird I", "Flora IV", "Just Believe! II", "Flitter IV", "Germination I");                      // Willo
+    AddLoadout(List, 2267, "Focusing Lens", "Spring Bloom IV", "Spring Forward III", "Rewind I", "Mesmerism III", "Encouragement I");           // Ying
+    AddLoadout(List, 2420, "Retaliation", "Blade Dance II", "Master Stance IV", "Perfect Block II", "Hideout II", "Up in Smoke II");            // Zhin
 
     return List;
 }
