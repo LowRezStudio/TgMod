@@ -25,6 +25,7 @@ var transient array<TmProxyActor> ProxyActors;
 var transient array<IncomingLoginData> IncomingLogins;
 var transient ServerParameters ServerParams;
 var transient class<PlayerController> NextControllerClass;
+var transient string NextPlayerGuid;
 
 var transient array<int> ChampionsToPrecache;
 var transient string DesiredChampionName;
@@ -37,6 +38,9 @@ function PlayerController SpawnPlayerController(Vector SpawnLocation, Rotator Sp
     if (NextControllerClass != none) {
         NewPC = Spawn(NextControllerClass,,, SpawnLocation, SpawnRotation);
         NextControllerClass = none;
+        if (NextPlayerGuid != "" && TgPlayerController(NewPC) != none)
+            TgPlayerController(NewPC).s_nPlayerId = `UTILS.ToInt(NextPlayerGuid);
+        NextPlayerGuid = "";
         if (TmSpectatorController(NewPC) != none) {
             NewPC.PlayerReplicationInfo.bOnlySpectator = true;
             NewPC.PlayerReplicationInfo.bIsSpectator = true;
@@ -123,12 +127,6 @@ event PreLogin(string Options, string Address, const UniqueNetId UniqueId, bool 
 
     Address = Repl(Address, ".", "");
 
-    for (i = 0; i < IncomingLogins.Length; i++) {
-        if (IncomingLogins[i].NetAddress == Address) {
-            IncomingLogins.Remove(i, 1);
-        }
-    }
-
     Data.NetAddress = Address;
     Data.PlayerGuid = ParseOption(Options, "playerguid");;
     Data.PlayerName = `UTILS.decodeURLParam(ParseOption(Options, "name"));
@@ -137,10 +135,19 @@ event PreLogin(string Options, string Address, const UniqueNetId UniqueId, bool 
     Data.password = ParseOption(Options, "password");
     Data.horse = ParseOption(Options, "horse");
 
+    if (Data.PlayerGuid != "") {
+        for (i = IncomingLogins.Length - 1; i >= 0; i--) {
+            if (IncomingLogins[i].PlayerGuid == Data.PlayerGuid) {
+                IncomingLogins.Remove(i, 1);
+            }
+        }
+    }
+
     if (Data.Team ~= "spec" || Data.Team ~= "spectator" || Data.Team ~= "3")
         NextControllerClass = Class'TmCore.TmSpectatorController';
     else
         NextControllerClass = Class'TgGame.TgPlayerController';
+    NextPlayerGuid = Data.PlayerGuid;
 
     BotId = `UTILS.GetChampionByName(Data.ChampionName).BotId;
     if (BotId > 0 && ChampionsToPrecache.Find(BotId) == -1) {
@@ -154,6 +161,7 @@ event PreLogin(string Options, string Address, const UniqueNetId UniqueId, bool 
 public event PostLogin(PlayerController NewPlayer) {
     local TgPlayerController TgPC;
     local TgRepInfo_Player PRI;
+    local TgRepInfo_Player SPRI;
     local TmProxyActor ProxyActor;
     local TgPawn_Character TgP;
     local TgRepInfo_Player TgRPI;
@@ -162,19 +170,37 @@ public event PostLogin(PlayerController NewPlayer) {
     local IncomingLoginData LoginData;
     local ChampionInfo ChampInfo;
     local string Address;
-    local int i, j, Team;
+    local int i, j, Team, LoginIndex, PlayerId;
     super.PostLogin(NewPlayer);
 
     Address = Repl(NewPlayer.GetPlayerNetworkAddress(), ".", "");
-    
+
+    LoginIndex = -1;
+    TgPC = TgPlayerController(NewPlayer);
+    if (TgPC != none)
+        PlayerId = TgPC.s_nPlayerId;
     for (i = 0; i < IncomingLogins.Length; i++) {
-        if (IncomingLogins[i].NetAddress == Address) {
-            LoginData = IncomingLogins[i];
+        if (PlayerId > 0 && IncomingLogins[i].PlayerGuid != ""
+            && `UTILS.ToInt(IncomingLogins[i].PlayerGuid) == PlayerId) {
+            LoginIndex = i;
             break;
         }
     }
+    if (LoginIndex == -1) {
+        for (i = 0; i < IncomingLogins.Length; i++) {
+            if (IncomingLogins[i].NetAddress == Address) {
+                LoginIndex = i;
+                break;
+            }
+        }
+    }
+    if (LoginIndex == -1 && IncomingLogins.Length > 0)
+        LoginIndex = 0;   // FIFO fallback
+    if (LoginIndex >= 0) {
+        LoginData = IncomingLogins[LoginIndex];
+        IncomingLogins.Remove(LoginIndex, 1);
+    }
 
-    TgPC = TgPlayerController(NewPlayer);
     TgRPI = TgRepInfo_Player(NewPlayer.PlayerReplicationInfo);
 
     ProxyActor = `UTILS.SetupProxy(TgPC);
@@ -198,10 +224,11 @@ public event PostLogin(PlayerController NewPlayer) {
     ProxyActor.ClientTestPrecache(2267, 18656, 18655, 18657);
 
     PRI = TgRepInfo_Player(TgPlayerController(NewPlayer).PlayerReplicationInfo);
+    SPRI = TgRepInfo_Player(TmSpectatorController(NewPlayer).PlayerReplicationInfo);
 
     Team = `UTILS.GetTeam(LoginData.Team, (self != none) ? GetPlayerCount() : 0);
-    if (Team == 10) {
-        //`UTILS.SetupPRI(self, PRI, LoginData.PlayerGuid, LoginData.PlayerName, 10, 0);
+    if (TmSpectatorController(NewPlayer) != none) {
+        `UTILS.SetupSpecPRI(self, SPRI, LoginData.PlayerGuid);
         SetupSpectator(ProxyActor, TgPC, LoginData);
     } else {
         if (!AttemptReconnect(TgPC, ProxyActor, LoginData)) {

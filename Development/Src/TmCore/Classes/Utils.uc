@@ -86,6 +86,8 @@ static function string DecodeURLParam(string encodedParam)
 
 static function SetupPRI(TgGame Game, TgRepInfo_Player PRI, string PlayerGuid, string PlayerName, int TaskForce, int MountId) {
     local TgPlayerController PC;
+    local TgRepInfo_Player CachedPRI;
+
     PC = TgPlayerController(PRI.Owner);
 
     PC.s_nPlayerId = ToInt(PlayerGuid);
@@ -106,6 +108,58 @@ static function SetupPRI(TgGame Game, TgRepInfo_Player PRI, string PlayerGuid, s
     PRI.bReadyToPlay = true;
     PRI.bWaitingPlayer = false;
     PRI.bAdmin = true;
+
+    CachedPRI = PC.CachedPRI;
+    CachedPRI.UniqueId.Uid.A = PC.s_nPlayerId;
+    CachedPRI.r_nPlayerId = PC.s_nPlayerId;
+    CachedPRI.PlayerName = PlayerName;
+
+    CachedPRI.r_nMountSkinId = MountId;
+
+    CachedPRI.SetTaskForceNumber(TaskForce, true);
+
+    CachedPRI.bOnlySpectator = false;
+    CachedPRI.bIsSpectator = false;
+    CachedPRI.bOutOfLives = false;
+    CachedPRI.bReadyToPlay = true;
+    CachedPRI.bWaitingPlayer = false;
+    CachedPRI.bAdmin = true;
+}
+
+static function SetupSpecPRI(TgGame Game, TgRepInfo_Player PRI, string PlayerGuid) {
+    local TmSpectatorController PC;
+    local TgRepInfo_Player CachedPRI;
+
+    PC = TmSpectatorController(PRI.Owner);
+
+    PC.s_nPlayerId = ToInt(PlayerGuid);
+    PC.s_qwNetAccessFlags.A = 0xFFFFFFFF;
+    PC.s_qwNetAccessFlags.B = 0xFFFFFFFF;
+
+    PRI.UniqueId.Uid.A = PC.s_nPlayerId;
+    PRI.r_nPlayerId = PC.s_nPlayerId;
+    PRI.PlayerName = "spectator";
+
+    PRI.SetTaskForceNumber(10, true);
+
+    PRI.bOnlySpectator = true;
+    PRI.bIsSpectator = true;
+    PRI.bOutOfLives = true;
+    PRI.bReadyToPlay = true;
+    PRI.bWaitingPlayer = false;
+
+    CachedPRI = PC.CachedPRI;
+    CachedPRI.UniqueId.Uid.A = PC.s_nPlayerId;
+    CachedPRI.r_nPlayerId = PC.s_nPlayerId;
+    CachedPRI.PlayerName = "spectator";
+
+    CachedPRI.SetTaskForceNumber(10, true);
+
+    CachedPRI.bOnlySpectator = true;
+    CachedPRI.bIsSpectator = true;
+    CachedPRI.bOutOfLives = true;
+    CachedPRI.bReadyToPlay = true;
+    CachedPRI.bWaitingPlayer = false;
 }
 
 static function SpawnPawn(TgGame Game, TgPlayerController PC, int BotId, int SkinId, int DeviceSkinId, int HeadId, int MountId) {
