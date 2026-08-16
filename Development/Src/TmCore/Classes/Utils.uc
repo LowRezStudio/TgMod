@@ -307,7 +307,7 @@ static function array<LoadoutInfo> GetAllLoadouts() {
     local array<LoadoutInfo> List;
 
     AddLoadout(List, 2205, "Dark Stalker", "Power of the Abyss IV", "Sleight of Hand I", "Buying Time I", "Elusive IV", "Seething Hatred II");  // Androxus
-    AddLoadout(List, 2404, "Battering Ram", "Heavy Metal IV", "Percussion IV", "Trebuchet I", "Gate Crasher IV", "Watchtower I");               // Ash
+    AddLoadout(List, 2404, "Battering Ram", "Heavy Metal IV", "Percussion II", "Trebuchet I", "Gate Crasher IV", "Watchtower I");               // Ash
     AddLoadout(List, 2073, "Tinkerin", "Healing Station IV", "Bowling Ball IV", "Failsafe II", "Double Time I", "Field Deploy I");              // Barik
     AddLoadout(List, 2281, "Chain Reaction", "Air Blast II", "Backdraft II", "King's New Cloak II", "Royal Decree IV", "King's Court II");      // Bomb King
     AddLoadout(List, 2147, "Bounce House", "Leg Day IV", "Stomping Ground II", "Seismic Wave IV", "Rapid Sustain I", "Giga Siphon I");          // Buck
@@ -317,7 +317,7 @@ static function array<LoadoutInfo> GetAllLoadouts() {
     AddLoadout(List, 2071, "Scorch", "Hot Pursuit IV", "Incinerate IV", "Heat Transfer I", "Last Stand II", "Launch I");                        // Fernando
     AddLoadout(List, 2093, "Totemic Ward", "Gale IV", "Shamanic Might I", "Outreach IV", "Crackle II", "Astral Traveler I");                    // Grohk
     AddLoadout(List, 2254, "Ferocity", "Verdant Expanse IV", "Gentle Breeze IV", "Adrenaline I", "Vine Grasp I", "Over Growth II");             // Grover
-    AddLoadout(List, 2348, "Mothers Grace", "Geomancer IV", "Steadfast II", "Shear I", "Lodestone I", "Stone Bulwark IV");                      // Inara
+    AddLoadout(List, 2348, "Mother's Grace", "Geomancer IV", "Steadfast II", "Shear I", "Lodestone I", "Stone Bulwark IV");                     // Inara
     AddLoadout(List, 2431, "Luminary", "Star Seeker IV", "Space Jam IV", "Relativity II", "Lightyears I", "Heavenly Pull I");                   // Jenos
     AddLoadout(List, 2249, "Steady Aim", "Prodigy IV", "Beam Me Up IV", "Open Season I", "Quick Scope II", "True Grit I");                      // Kinessa
     AddLoadout(List, 2362, "Death Hastens", "Warrants Out IV", "Requip II", "Wicked Don't Rest IV", "Conditioned I", "Compel I");               // Lex

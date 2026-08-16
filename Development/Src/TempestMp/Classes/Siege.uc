@@ -296,6 +296,11 @@ function SetupPlayer(TmProxyActor ProxyActor, TgPlayerController PC, IncomingLog
 
     RestartPlayer(PC);
 
+    PC.r_bAutoPurchase = false;
+    if (Role == ROLE_Authority) {
+        PC.r_bAutoPurchase = false;
+    }
+
     Pawn = TgPawn_Character(PC.Pawn);
     if (Pawn != none) {
         `UTILS.ApplyLoadoutToPawn(PC, Pawn, DesiredLoadout);
