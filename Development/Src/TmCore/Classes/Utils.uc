@@ -140,7 +140,11 @@ static function SetupSpecPRI(TgGame Game, TgRepInfo_Player PRI, string PlayerGui
     PRI.r_nPlayerId = PC.s_nPlayerId;
     PRI.PlayerName = "spectator";
 
-    PRI.SetTaskForceNumber(10, true);
+    // r_TaskForce stays unset (none) on the server on purpose: if it replicated,
+    // the native taskforce reconcile would add this PRI to a team's player list and
+    // the spec would show in the scoreboard. The HUD's "blue" team is set locally
+    // on the spec's client instead (TmSpectatorController::ClientSetFollowTeam).
+    `LogInfo('TmSiege', "SetupSpecPRI: PRI class="$PRI.Class$" owner="$PC);
 
     PRI.bOnlySpectator = true;
     PRI.bIsSpectator = true;
@@ -152,8 +156,6 @@ static function SetupSpecPRI(TgGame Game, TgRepInfo_Player PRI, string PlayerGui
     CachedPRI.UniqueId.Uid.A = PC.s_nPlayerId;
     CachedPRI.r_nPlayerId = PC.s_nPlayerId;
     CachedPRI.PlayerName = "spectator";
-
-    CachedPRI.SetTaskForceNumber(10, true);
 
     CachedPRI.bOnlySpectator = true;
     CachedPRI.bIsSpectator = true;

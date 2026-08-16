@@ -347,6 +347,12 @@ function SetupSpectator(TmProxyActor ProxyActor, TgPlayerController PC, Incoming
 
     SPC.ForwardToSpectatingMatch();
 
+    // The spec's r_TaskForce stays unset (none) everywhere on purpose: setting it
+    // (even locally) triggers the native membership reconcile that puts the spec in
+    // the scoreboard on the spec's own client. With r_TaskForce none, the top HUD
+    // defaults GetBlueTaskforce=team 1 and GetRedTaskforce=team 2 (both bars show)
+    // and the spec is in no member list anywhere.
+
     foreach WorldInfo.AllControllers(Class'TgGame.TgPlayerController', TargetPC) {
         if (TargetPC == PC)
             continue;
