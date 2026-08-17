@@ -52,6 +52,69 @@ static function SetupCM(TgPlayerController PC) {
     }
 }
 
+static function TgGfxScene FindSceneByClassName(TgGameHUD H, name ClassName) {
+    local TgGfxScene Found;
+    local int i;
+
+    if (H == none) {
+        return none;
+    }
+
+    for (i = 0; i < H.m_SceneStack.Length; i++) {
+        Found = FindSceneByClassWalk(H.m_SceneStack[i], ClassName);
+        if (Found != none) {
+            return Found;
+        }
+    }
+    for (i = 0; i < H.m_PopupStack.Length; i++) {
+        Found = FindSceneByClassWalk(H.m_PopupStack[i], ClassName);
+        if (Found != none) {
+            return Found;
+        }
+    }
+    return none;
+}
+
+static function TgGfxScene FindSceneByClassWalk(TgGfxScene Scene, name ClassName) {
+    local UIHud H;
+    local UIGameMoviePlayer P;
+    local TgGfxScene Found;
+    local int i;
+
+    if (Scene != none && Scene.Class.Name == ClassName) {
+        return Scene;
+    }
+
+    H = UIHud(Scene);
+    if (H == none) {
+        return none;
+    }
+
+    for (i = 0; i < ArrayCount(H.m_mcSubscenes); i++) {
+        if (H.m_mcSubscenes[i] != none) {
+            if (H.m_mcSubscenes[i].Class.Name == ClassName) {
+                return H.m_mcSubscenes[i];
+            }
+            Found = FindSceneByClassWalk(H.m_mcSubscenes[i], ClassName);
+            if (Found != none) {
+                return Found;
+            }
+        }
+    }
+
+    P = H.m_pMovie;
+    if (P == none) {
+        return none;
+    }
+
+    for (i = 0; i < P.m_Scenes.Length; i++) {
+        if (P.m_Scenes[i] != none && P.m_Scenes[i].Class.Name == ClassName) {
+            return P.m_Scenes[i];
+        }
+    }
+    return none;
+}
+
 static function int ToInt(coerce int strNb) {
     return strNb;
 }
@@ -140,12 +203,7 @@ static function SetupSpecPRI(TgGame Game, TgRepInfo_Player PRI, string PlayerGui
     PRI.r_nPlayerId = PC.s_nPlayerId;
     PRI.PlayerName = "spectator";
 
-    // r_TaskForce stays unset (none) on the server on purpose: if it replicated,
-    // the native taskforce reconcile would add this PRI to a team's player list and
-    // the spec would show in the scoreboard. The HUD's "blue" team is set locally
-    // on the spec's client instead (TmSpectatorController::ClientSetFollowTeam).
-    `LogInfo('TmSiege', "SetupSpecPRI: PRI class="$PRI.Class$" owner="$PC);
-
+    PRI.SetTaskForceNumber(10, true);
     PRI.bOnlySpectator = true;
     PRI.bIsSpectator = true;
     PRI.bOutOfLives = true;
@@ -157,6 +215,7 @@ static function SetupSpecPRI(TgGame Game, TgRepInfo_Player PRI, string PlayerGui
     CachedPRI.r_nPlayerId = PC.s_nPlayerId;
     CachedPRI.PlayerName = "spectator";
 
+    CachedPRI.SetTaskForceNumber(10, true);
     CachedPRI.bOnlySpectator = true;
     CachedPRI.bIsSpectator = true;
     CachedPRI.bOutOfLives = true;
@@ -328,6 +387,7 @@ static function array<string> GetAllChampionNames() {
 
 static function ApplyChampionToPRI(TgRepInfo_Player PRI, ChampionInfo C) {
     local TgPlayerController PC;
+    local TgRepInfo_Player CPRI;
 
     if (PRI == none || C.BotId <= 0) {
         return;
@@ -342,6 +402,12 @@ static function ApplyChampionToPRI(TgRepInfo_Player PRI, ChampionInfo C) {
     PRI.r_nSkinId = C.SkinId;
     PRI.r_nHeadSkinId = C.HeadId;
     PRI.r_nWeaponSkinId = C.WeaponSkinId;
+
+    CPRI = PC.CachedPRI;
+    CPRI.r_nProfileId = C.BotId;
+    CPRI.r_nSkinId = C.SkinId;
+    CPRI.r_nHeadSkinId = C.HeadId;
+    CPRI.r_nWeaponSkinId = C.WeaponSkinId;
 }
 
 static final function AddLoadout(out array<LoadoutInfo> List, int BotId,

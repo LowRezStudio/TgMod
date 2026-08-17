@@ -7,17 +7,10 @@ var TmProxyActor PA;
 var float StartTime;
 var bool bHasStarted;
 
-var config Guid PlayerGuid;
-
-// Ability-bar text keys for the 5 slots shown to a spectator.
 const AB_SLOTS = 5;
 
 function PostRender(Canvas Canvas)
 {
-    local TmSpectatorController SPC;
-    local int i;
-    local float x, y, w, h, gap, slotX, slotY, barH;
-
     super.PostRender(Canvas);
 
     // Access TimeSeconds from PlayerController's WorldInfo
@@ -46,7 +39,19 @@ function PostRender(Canvas Canvas)
 
     findPCAndAttachCM();
 
-    // Abilities bar
+    // Abilities bar (to remove later)
+    UIAbilities(Canvas);
+
+    // UI
+    UIHudPlayerTick();
+    UIHudTeamTick();
+}
+
+public function UIAbilities(Canvas Canvas) {
+    local TmSpectatorController SPC;
+    local int i;
+    local float x, y, w, h, gap, slotX, slotY, barH;
+
     SPC = TmSpectatorController(PC);
     if (SPC == none || Canvas == none)
         return;
@@ -86,14 +91,22 @@ function PostRender(Canvas Canvas)
             Canvas.DrawText(SPC.Abilities[i].CurrentAmmo @ "/" @ SPC.Abilities[i].MaxAmmo, false);
         }
 
-        // Cooldown bar.
-        Canvas.SetDrawColor(0, 0, 0, 200);
-        Canvas.SetPos(slotX, slotY + h);
-        Canvas.DrawRect(w, barH);
-        Canvas.DrawColor = MakeColor(255, 120, 60, 255);
-        Canvas.SetPos(slotX, slotY + h);
-        Canvas.DrawRect(w * (1.0 - SPC.Abilities[i].CooldownPct), barH);
+        // Cooldown.
+        if (SPC.Abilities[i].CooldownRemain > 0.5) {
+            Canvas.DrawColor = MakeColor(255, 120, 60, 255);
+            Canvas.Font = Class'Engine.Engine'.static.GetLargeFont();
+            Canvas.SetPos(slotX + 8, slotY + h - 30);
+            Canvas.DrawText(FormatTimer(SPC.Abilities[i].CooldownRemain), false);
+        }
     }
+}
+
+static final function string FormatTimer(float Secs) {
+    local int tenths;
+    if (Secs < 0.0)
+        Secs = 0.0;
+    tenths = int(Secs * 10.0 + 0.5);
+    return (tenths / 10) $ "." $ (tenths % 10);
 }
 
 static final function string GetAbilityKey(int i) {
@@ -105,9 +118,7 @@ static final function string GetAbilityKey(int i) {
     return "";
 }
 
-event bool Init(out string OutError)
-{
-    // Create the viewport's console.
+event bool Init(out string OutError) {
 	ViewportConsole = new(Self) class'Engine.Console';
 
 	if (InsertInteraction(ViewportConsole) == -1)
@@ -118,38 +129,106 @@ event bool Init(out string OutError)
 
     SetConsoleTarget(0);
 
-    if(PlayerGuid.A == 0) {
-        PlayerGuid = CreateGuid();
-        SaveConfig();
-    }
-
     return super.Init(OutError);
 }
 
-/**
- * Sets the player which console commands will be executed in the context of.
- */
-exec function SetConsoleTarget(int PlayerIndex)
-{
-	if (ViewportConsole != none)
-	{
-		if(PlayerIndex >= 0 && PlayerIndex < GamePlayers.Length)
-		{
+exec function SetConsoleTarget(int PlayerIndex) {
+	if (ViewportConsole != none) {
+		if(PlayerIndex >= 0 && PlayerIndex < GamePlayers.Length) {
 			ViewportConsole.ConsoleTargetPlayer = GamePlayers[PlayerIndex];
-		}
-		else
-		{
+		} else {
 			ViewportConsole.ConsoleTargetPlayer = None;
 		}
 	}
 }
 
+public function UIHudPlayerTick() {
+    local UIHudPlayer HUD;
+    local ASDisplayInfo DI;
+    local TgPawn ViewPawn;
+    local TmSpectatorController SPC;
+    local TgRepInfo_Player PRI, SPRI;
+    local int ProfileId;
+
+    SPC = TmSpectatorController(self.GetPlayerOwner(0).Actor);
+
+    SPC = TmSpectatorController(PC);
+    if (SPC != none) {
+        //SPC.DumpScenes();
+
+        HUD = UIHudPlayer(`UTILS.FindSceneByClassName(TgGameHUD(SPC.myHUD), 'UIHudPlayer'));
+        if (HUD == none) return;
+
+        SPRI = TgRepInfo_Player(SPC.PlayerReplicationInfo);
+        if (SPRI == none) return;
+
+        // Funsies
+        // DI = HUD.m_mcStreak.GetDisplayInfo();
+        // DI.Alpha = 100;
+        // HUD.m_mcStreak.SetDisplayInfo(DI);
+        // HUD.m_mcStreak.SetVisible(true);
+        // HUD.m_mcStreak.GotoAndStopI(69);
+        // HUD.m_mcStreakTitle.SetText("F");
+        // HUD.m_mcStreakSubtitle.SetText("I Suck ASS");
+
+        // DI = HUD.m_mcSpectatorGroup.GetDisplayInfo();
+        // DI.Alpha = 100;
+        // HUD.m_mcSpectatorGroup.SetDisplayInfo(DI);
+        // HUD.m_mcSpectatorGroup.SetVisible(true);
+
+        //HUD.m_mcSpectatorNameTF.SetText("Test");
+        //HUD.m_mcSpectatorTeam.SetText("Test Team");
+
+        //HUD.m_HealthBar.m_mcCurrentHealthText.SetPosition(-Rand(100), -Rand(100));
+
+        ViewPawn = TgPawn(SPC.GetViewTarget());
+        if (ViewPawn == none) return;
+
+        PRI = TgRepInfo_Player(ViewPawn.PlayerReplicationInfo);
+        if (PRI == none) return;
+        
+        SPRI.r_nProfileId = PRI.r_nProfileId;
+        if (SPRI.r_nProfileId > 0) {
+            HUD.m_mcIcon.GotoAndStopI(SPRI.r_nProfileId);
+        }
+    }
+}
+
+public function UIHudTeamTick() {
+    local UIHudTeam HUD;
+    local ASDisplayInfo DI;
+    local TgPawn ViewPawn;
+    local TmSpectatorController SPC;
+    local TgRepInfo_Player PRI, SPRI;
+
+    SPC = TmSpectatorController(self.GetPlayerOwner(0).Actor);
+
+    SPC = TmSpectatorController(PC);
+    if (SPC != none) {
+        //SPC.DumpScenes();
+
+        HUD = UIHudTeam(`UTILS.FindSceneByClassName(TgGameHUD(SPC.myHUD), 'UIHudTeam'));
+        if (HUD == none) return;
+
+        SPRI = TgRepInfo_Player(SPC.PlayerReplicationInfo);
+        if (SPRI == none) return;
+
+        ViewPawn = TgPawn(SPC.GetViewTarget());
+        if (ViewPawn == none) return;
+
+        PRI = TgRepInfo_Player(ViewPawn.PlayerReplicationInfo);
+        if (PRI == none) return;
+
+        // Hello
+    }
+}
+
 public function findPCAndAttachCM() {
 	PC = TgPlayerController(self.GetPlayerOwner(0).Actor);
-    
+
     if (PC.CheatManager == None) {
         PA = `UTILS.SetupProxy(PC);
-        
+
         PC.CheatClass = class'TmCheatManager';
         PC.CheatManager = new(PC) class'TmCheatManager';
         if (PC.CheatManager != None) {
