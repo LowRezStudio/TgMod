@@ -5,4 +5,5 @@
 `define TmError(msg,cat) `log("ERROR:" @ `msg, true, `cat)
 
 `define UTILS class'TmCore.Utils'.static
+`define UIUTILS class'TmCore.UIUtils'.static
 `define VPC class'TmCore.TmGameViewportClient'.static
