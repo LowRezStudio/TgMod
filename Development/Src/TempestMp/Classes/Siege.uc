@@ -331,6 +331,8 @@ function SetupPlayer(TmProxyActor ProxyActor, TgPlayerController PC, IncomingLog
     Pawn = TgPawn_Character(PC.Pawn);
     if (Pawn != none) {
         `UTILS.ApplyLoadoutToPawn(PC, Pawn, DesiredLoadout);
+        // Remove mid air inaccuracy
+        Pawn.m_bAirAccuracyPenalty = false;
     }
 
     ProxyActor.ClientConsoleCommand("setreadytoplay");
