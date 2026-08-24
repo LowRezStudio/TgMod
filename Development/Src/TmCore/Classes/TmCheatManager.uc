@@ -2,7 +2,6 @@ class TmCheatManager extends TgBattleCheatManager within TgPlayerController
     config(Game);
 
 var TmProxyActor Proxy;
-var int DumpGfxDepth;
 
 function TmProxyActor GetProxy() {
     local TmProxyActor PA;

@@ -3,33 +3,21 @@ class TmSpectatorController extends TgSpectatorController
     hidecategories(Navigation)
     dependson(TgObject);
 
-struct transient SpecAbility {
-    var string DeviceName;
-    var float CooldownPct;
-    var float CooldownRemain;
-    var int CurrentAmmo;
-    var int MaxAmmo;
+struct transient BurnCard {
+    var int DeviceID;
+    var int Power; // Card level
 };
-var transient SpecAbility Abilities[5];
-var transient bool bTimerOn;
+var transient BurnCard BurnCards[4];
 
 var transient bool bClonedHUD;
 var transient int LastClonedTickCount;
 var transient int bBorderBuilt;
-
-const ABILITY_SLOTS = 5;
 
 simulated function ForwardToSpectatingMatch()
 {
     super.ForwardToSpectatingMatch();
     if (WorldInfo.NetMode != NM_DedicatedServer)
         SetSpectatorCameraMode(SpectatorCameraMode.SpecCam_FollowThirdPerson);
-}
-
-simulated function SpecAbility GetAbility(int i)
-{
-    if (i >= 0 && i < ABILITY_SLOTS)
-        return Abilities[i];
 }
 
 public function Class<HUD> GetHudClass(Class<HUD> pNewHudType)
@@ -41,84 +29,33 @@ public function Class<HUD> GetHudClass(Class<HUD> pNewHudType)
 function SpectatorSetViewTarget(Actor VT, optional ViewTargetTransitionParams TransitionParams)
 {
     super.SpectatorSetViewTarget(VT, TransitionParams);
-    if (Role == ROLE_Authority && !bTimerOn)
-    {
-        ClearTimer('TickFollowAbilities');
-        SetTimer(0.15, true, 'TickFollowAbilities');
-        bTimerOn = true;
-    }
 }
 
-simulated function TickFollowAbilities()
+simulated function TickBurnsHud()
 {
-    local int i, slot;
-    local int EquipSlots[5];
-    local TgPawn FollowPawn;
-    local TgDevice Dev;
-    local TgTimerManager TM;
-    local float remain, total;
-    local SpecAbility A;
+    local UIHudCards CardsHUD;
+    local UIHudBurns BurnHUD;
+    local TgPawn ViewPawn;
+    local TgRepInfo_Player ViewPRI;
+    local int DeviceIds[4], Powers[4], i;
 
-    EquipSlots[0] = 1;
-    EquipSlots[1] = 16;
-    EquipSlots[2] = 3;
-    EquipSlots[3] = 4;
-    EquipSlots[4] = 2;
-
-    FollowPawn = TgPawn(GetViewTarget());
-    if (FollowPawn == none || FollowPawn.Controller == none || !FollowPawn.IsAliveAndWell())
+    CardsHUD = UIHudCards(`UTILS.FindSceneByClassName(TgGameHUD(myHUD), 'UIHudCards'));
+    if (CardsHUD == none)
     {
-        for (i = 0; i < ABILITY_SLOTS; i++)
-        {
-            Abilities[i].DeviceName = "";
-            Abilities[i].CooldownPct = -1;
-            Abilities[i].CooldownRemain = 0;
-            Abilities[i].CurrentAmmo = 0;
-            Abilities[i].MaxAmmo = 0;
-        }
-        ClientUpdateAbilities(Abilities);
+        `log("BurnHud: no UIHudCards",,'TmSpec');
         return;
     }
+    BurnHUD = UIHudBurns(`UTILS.FindSceneByClassName(TgGameHUD(myHUD), 'UIHudBurns'));
 
-    for (i = 0; i < ABILITY_SLOTS; i++)
-    {
-        slot = EquipSlots[i];
-        A.DeviceName = "";
-        A.CooldownPct = -1;
-        A.CooldownRemain = 0;
-        A.CurrentAmmo = 0;
-        A.MaxAmmo = 0;
-        Dev = FollowPawn.GetDeviceByEqPoint(slot);
-        if (Dev != none)
-        {
-            A.DeviceName = Dev.GetDeviceName();
-            if (Dev.r_nMaxAmmoClipCount > 0)
-            {
-                A.CurrentAmmo = Dev.GetCurrentAmmoAmount();
-                A.MaxAmmo = Dev.r_nMaxAmmoClipCount;
-            }
-            TM = Dev.GetCooldownTimerManager();
-            if (TM != none)
-            {
-                remain = Dev.GetCooldownRemaining();
-                total = TM.GetTimeInitial(0);
-                if (total > 0.0001)
-                {
-                    A.CooldownPct = FClamp(remain / total, 0.0, 1.0);
-                    A.CooldownRemain = remain;
-                }
-            }
-        }
-        Abilities[i] = A;
-    }
-    ClientUpdateAbilities(Abilities);
-}
+    ViewPawn = TgPawn(GetViewTarget());
+    if (ViewPawn != none)
+        ViewPRI = TgRepInfo_Player(ViewPawn.PlayerReplicationInfo);
+    if (ViewPRI == none)
+        ViewPRI = TgRepInfo_Player(PlayerReplicationInfo);
 
-reliable client function ClientUpdateAbilities(SpecAbility NewAbilities[5])
-{
-    local int i;
-    for (i = 0; i < ABILITY_SLOTS; i++)
-        Abilities[i] = NewAbilities[i];
+    `UIUTILS.GetSpectatedBurnIds(ViewPRI, ViewPawn, DeviceIds, Powers);
+    
+    `UIUTILS.SyncBurnsToScene(CardsHUD, BurnHUD, DeviceIds, Powers);
 }
 
 simulated function TickSpectatorPlayerHUD()
@@ -187,8 +124,10 @@ simulated function TickSpectatorPlayerHUD()
     if (Group.GetObject("Tip") != none && OgGroup.GetObject("Tip") != none)
         Group.GetObject("Tip").SetDisplayInfo(OgGroup.GetObject("Tip").GetDisplayInfo());
 
-    `UIUTILS.SetGameText(Group.GetObject("Streak").GetObject("Title"), "+67");
-    `UIUTILS.SetGameText(Group.GetObject("Streak").GetObject("Subtitle"), "AURA");
+    Group.GetObject("Streak").SetVisible(`UTILS.ToInt(Group.GetObject("Streak").GetText()) > 0 ? true : false);
+
+    `UIUTILS.SetGameText(Group.GetObject("Streak").GetObject("Title"), PRI.r_nKillstreak);
+    `UIUTILS.SetGameText(Group.GetObject("Streak").GetObject("Subtitle"), "STREAK");
 
     `UIUTILS.BuildFillTicks(OgHealthBar, HealthBarTickContainer, TaskForce, LastClonedTickCount);
     `UIUTILS.BuildBorderTicks(OgHealthBar, Group, TaskForce, bBorderBuilt);
@@ -200,6 +139,8 @@ simulated function TickSpectatorPlayerHUD()
     `UIUTILS.SyncHealFeedContainer(OgGroup, Group);
 
     SPRI.r_nProfileId = PRI.r_nProfileId;
+    SPRI.r_nCredits = PRI.r_nCredits;
+    SPRI.r_nEarnedCredits = PRI.r_nEarnedCredits;
 
     if (PRI.r_nProfileId > 0)
         `UIUTILS.SyncIcon(Group.GetObject("Icon"), HUD.m_mcIcon);
