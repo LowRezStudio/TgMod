@@ -22,7 +22,7 @@ static function MirrorClip(GFxObject DstParent, GFxObject SrcParent, string Clip
 
 /** Sets text on Parent handling the game's inconsistent TF holder pattern.
  *  Tries Parent.TF -> Parent.Text -> Parent.textField -> Parent.SetText. */
-static function bool SetGameText(GFxObject Parent, string Text)
+static function bool SetGameText(GFxObject Parent, coerce string Text)
 {
     local GFxObject TF;
     if (Parent == none) return false;
@@ -86,6 +86,99 @@ static function bool SyncIcon(GFxObject CloneIcon, GFxObject OrigIcon)
     Url = OrigIcon.GetString("initialSource");
     if (Url == "" || Url == "undefined") return false;
     return LoadTextureLoader(CloneIcon, Url);
+}
+
+static function int FindBurnIconFrameByDeviceId(TgGfxScene DataSource, int DeviceId)
+{
+    local UIDataManager DM;
+    local int i;
+    if (DataSource == none || DeviceId == 0 || DataSource.m_pUIData == none) return 0;
+    DM = DataSource.m_pUIData;
+    if (DM.m_CommonData == none) return 0;
+    for (i = 0; i < DM.m_CommonData.m_BurnAll.Length; i++)
+        if (DM.m_CommonData.m_BurnAll[i].m_nId == DeviceId)
+            return DM.m_CommonData.m_BurnAll[i].m_nIcon;
+    for (i = 0; i < DM.m_CommonData.m_BurnA.Length; i++)
+        if (DM.m_CommonData.m_BurnA[i].m_nId == DeviceId)
+            return DM.m_CommonData.m_BurnA[i].m_nIcon;
+    for (i = 0; i < DM.m_CommonData.m_BurnB.Length; i++)
+        if (DM.m_CommonData.m_BurnB[i].m_nId == DeviceId)
+            return DM.m_CommonData.m_BurnB[i].m_nIcon;
+    for (i = 0; i < DM.m_CommonData.m_BurnC.Length; i++)
+        if (DM.m_CommonData.m_BurnC[i].m_nId == DeviceId)
+            return DM.m_CommonData.m_BurnC[i].m_nIcon;
+    for (i = 0; i < DM.m_CommonData.m_BurnD.Length; i++)
+        if (DM.m_CommonData.m_BurnD[i].m_nId == DeviceId)
+            return DM.m_CommonData.m_BurnD[i].m_nIcon;
+    return 0;
+}
+
+static function GetSpectatedBurnIds(TgRepInfo_Player ViewPRI, TgPawn ViewPawn, out int DeviceIds[4], out int Powers[4])
+{
+    local int i, eq;
+    local TgDevice Dev;
+    for (i = 0; i < 4; i++)
+    {
+        eq = 8 + i;
+        DeviceIds[i] = 0;
+        Powers[i] = 0;
+        if (ViewPRI != none)
+        {
+            DeviceIds[i] = ViewPRI.r_PlayerDevices[eq].CurrentDeviceId;
+            Powers[i] = ViewPRI.r_PlayerDevices[eq].Power;
+
+            if (DeviceIds[i] != 0 && Powers[i] == 0)
+                Powers[i] = ViewPRI.r_PlayerDevices[eq].CurrentDeviceCount;
+            if (DeviceIds[i] != 0 && Powers[i] == 0) Powers[i] = 1;
+        }
+
+        if (DeviceIds[i] == 0 && ViewPawn != none)
+        {
+            Dev = ViewPawn.GetDeviceByEqPoint(eq);
+            if (Dev != none)
+            {
+                DeviceIds[i] = Dev.r_nDeviceId;
+                if (Powers[i] == 0 && DeviceIds[i] != 0) Powers[i] = 1;
+            }
+        }
+    }
+}
+
+static function bool SyncBurnsToScene(UIHudCards CardsHUD, UIHudBurns BurnHUD, int DeviceIds[4], int Powers[4])
+{
+    local int i, Frame;
+    local GFxObject IconObj, PowerLevel, Obj;
+    local TgGfxScene DataSource;
+    if (CardsHUD == none) return false;
+    if (BurnHUD != none) DataSource = BurnHUD;
+    else DataSource = CardsHUD;
+    for (i = 0; i < 4; i++)
+    {
+        IconObj = CardsHUD.m_CardDisplayGroup.Items[i].Icon;
+        Obj = CardsHUD.m_CardDisplayGroup.Items[i].Obj;
+        if (IconObj == none) continue;
+        if (DeviceIds[i] == 0)
+        {
+            CardsHUD.FadeOut(IconObj, 0.05);
+            if (Obj != none) CardsHUD.FadeOut(Obj, 0.05);
+            continue;
+        }
+
+        Frame = FindBurnIconFrameByDeviceId(DataSource, DeviceIds[i]);
+        if (Frame == 0 && DataSource != CardsHUD)
+            Frame = FindBurnIconFrameByDeviceId(CardsHUD, DeviceIds[i]);
+        if (Frame > 0)
+        {
+            CardsHUD.CancelAnim(IconObj);
+            IconObj.GotoAndStopI(Frame);
+            CardsHUD.FadeIn(IconObj, 0.05);
+            if (Obj != none) { CardsHUD.CancelAnim(Obj); CardsHUD.FadeIn(Obj, 0.05); }
+        }
+        PowerLevel = CardsHUD.m_CardDisplayGroup.Items[i].PowerLevel;
+        if (PowerLevel != none && Powers[i] > 0)
+            PowerLevel.GotoAndStopI(Powers[i]);
+    }
+    return true;
 }
 
 static function BuildFillTicks(UIComponent_HealthBar Bar, GFxObject Container, int TeamColor, out int LastCount)
