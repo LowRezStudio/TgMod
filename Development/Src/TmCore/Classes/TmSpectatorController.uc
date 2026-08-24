@@ -17,6 +17,9 @@ var transient bool bClonedHUD;
 var transient int LastClonedTickCount;
 var transient int bBorderBuilt;
 
+// Pawn currently forced into the client-side first person rig, if any.
+var transient TgPawn m_NudgedFpPawn;
+
 const ABILITY_SLOTS = 5;
 
 simulated function ForwardToSpectatingMatch()
@@ -38,8 +41,132 @@ public function Class<HUD> GetHudClass(Class<HUD> pNewHudType)
     return Class'TgClient.TgGameHUD';
 }
 
+exec function SpecToggleFirstPerson()
+{
+    if (int(m_CameraMode) == int(SpectatorCameraMode.SpecCam_FollowFirstPerson))
+        SetSpectatorCameraMode(SpectatorCameraMode.SpecCam_FollowThirdPerson);
+    else
+        SetSpectatorCameraMode(SpectatorCameraMode.SpecCam_FollowFirstPerson);
+}
+
+// Same bookkeeping as the stock mode 3 handler, but swaps in our own camera
+// module so the POV is driven from script instead of the native gate.
+exec function SetSpectatorCameraMode(TgSpectatorController.SpectatorCameraMode Mode, optional bool bCameraTween = false)
+{
+    if (int(Mode) != int(SpectatorCameraMode.SpecCam_FollowFirstPerson))
+    {
+        super.SetSpectatorCameraMode(Mode, bCameraTween);
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    if (int(Mode) == int(m_CameraMode))
+        return;
+
+    m_CameraMode = Mode;
+    m_bIsMapSquashed = false;
+    if (bCameraTween)
+        TgPlayerCamera(PlayerCamera).SwitchCameras(class'TmCore.TmCameraModule_SpectatorFirstPerson', 0.2);
+    else
+        TgPlayerCamera(PlayerCamera).SwitchCameras(class'TmCore.TmCameraModule_SpectatorFirstPerson');
+}
+
+// Opens the native first person gate (ATgPawn::ShouldBeFirstPersonThisTick,
+// live path) for the followed pawn. The gate requires:
+//   Controller != none, IsA(TgPlayerController) and !Controller->Wants3P()
+// A spectated pawn normally fails the first test because other players'
+// controllers are never replicated to us. Assigning ourselves client-side is
+// safe: Pawn.Controller is owner-only replicated so it never leaves this
+// machine, and the real owner keeps authoritative control server-side.
+// Wants3P() returns true when the current camera module derives from
+// TgCameraModule_ThirdPerson (with zoom applied) or when a 3P camera posture
+// is pushed, which is why our FP camera module must NOT derive from any
+// ThirdPerson module and why we keep the posture cleared. With the gate open,
+// the engine builds the entire native first person rig (viewmodel, Camera_bn
+// eye position) and its device loop adapts FP<->3P during abilities/mounts
+// exactly like the followed player sees. The spectated pawn's world model is
+// hidden absolutely (bOwnerNoSee cannot work: Owner never replicates to us).
+simulated function UpdateFirstPersonNudge()
+{
+    local TgPawn ViewPawn;
+    local bool bNativeFP;
+
+    if (m_CameraMode != SpectatorCameraMode.SpecCam_FollowFirstPerson)
+    {
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    ViewPawn = TgPawn(GetViewTarget());
+    // Never touch pawns we have authority over (listen server): the fake
+    // Controller assignment is only safe on simulated proxies.
+    if (ViewPawn == none || !ViewPawn.IsAliveAndWell() || ViewPawn.Role >= ROLE_Authority)
+    {
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    if (m_NudgedFpPawn != none && m_NudgedFpPawn != ViewPawn)
+        ClearFirstPersonNudge();
+
+    m_NudgedFpPawn = ViewPawn;
+    ViewPawn.Controller = self;
+
+    // Single source of truth: ask the engine whether this pawn is first person
+    // this tick. The native device loop already accounts for abilities, mounts
+    // and emotes; our camera module just flips between the eye pose and the
+    // behind-view pose without ever leaving its class.
+    bNativeFP = ViewPawn.ShouldBeFirstPersonThisTick();
+    m_bBehindView = !bNativeFP;
+
+    SetRealModelHidden(ViewPawn, bNativeFP);
+    SetForced3PPose(!bNativeFP);
+
+    // Wants3P() folds in the posture stack; make sure nothing 3P is latched.
+    if (int(c_eCameraPosture) != 0)
+        c_eCameraPosture = TG_CAMERAPOSTURE_None;
+}
+
+simulated function SetForced3PPose(bool bForced3P)
+{
+    local TmCameraModule_SpectatorFirstPerson CamMod;
+
+    if (PlayerCamera == none)
+        return;
+    CamMod = TmCameraModule_SpectatorFirstPerson(TgPlayerCamera(PlayerCamera).CurrentCameraMod);
+    if (CamMod != none)
+        CamMod.m_bForced3P = bForced3P;
+}
+
+// Hiding must be absolute: the pawn's Mesh uses bOwnerNoSee semantics against
+// an Owner that is never replicated to spectators.
+simulated function SetRealModelHidden(TgPawn ViewPawn, bool bHidden)
+{
+    if (ViewPawn.Mesh != none)
+        ViewPawn.Mesh.SetHidden(bHidden);
+    if (ViewPawn.m_WeaponMesh != none && ViewPawn.m_WeaponMesh.m_WeaponMesh3P != none)
+        ViewPawn.m_WeaponMesh.m_WeaponMesh3P.SetHidden(bHidden);
+}
+
+simulated function ClearFirstPersonNudge()
+{
+    local TgPawn Nudged;
+
+    if (m_NudgedFpPawn == none)
+        return;
+
+    Nudged = m_NudgedFpPawn;
+    m_NudgedFpPawn = none;
+    SetRealModelHidden(Nudged, false);
+    SetForced3PPose(false);
+    if (Nudged.Controller == self)
+        Nudged.Controller = none;
+    m_bBehindView = true;
+}
+
 function SpectatorSetViewTarget(Actor VT, optional ViewTargetTransitionParams TransitionParams)
 {
+    ClearFirstPersonNudge();
     super.SpectatorSetViewTarget(VT, TransitionParams);
     if (Role == ROLE_Authority && !bTimerOn)
     {

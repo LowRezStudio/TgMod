@@ -39,6 +39,7 @@ function PostRender(Canvas Canvas)
 
     if (TmSpectatorController(PC) != none)
     {
+        TmSpectatorController(PC).UpdateFirstPersonNudge();
         TmSpectatorController(PC).TickSpectatorPlayerHUD();
         TmSpectatorController(PC).TickSpectatorTeamHUD();
     }
