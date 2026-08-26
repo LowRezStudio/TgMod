@@ -92,20 +92,13 @@ exec function SetSpectatorCameraMode(TgSpectatorController.SpectatorCameraMode M
         TgPlayerCamera(PlayerCamera).SwitchCameras(class'TmCore.TmCameraModule_SpectatorFirstPerson');
 }
 
-// Opens the native first person gate (ATgPawn::ShouldBeFirstPersonThisTick,
-// live path) for the followed pawn by assigning the local spectator
-// controller to its Controller reference client-side. Pawn.Controller is
-// owner-only replicated so the assignment never leaves this machine and the
-// real owner keeps authoritative control server-side. Attaching a LOCAL
-// controller is deliberate: many effect playback paths branch on
-// IsLocallyControlled(), and the local branches are the ones that reliably
-// play tracers/impacts/explosions for the spectated pawn (non-local stand-in
-// controllers suppress them).
-// Wants3P() returns false for us because our FP camera module does not derive
-// from TgCameraModule_ThirdPerson and no 3P camera posture is latched, which
-// opens the gate and makes the engine build the entire native first person
-// rig (viewmodel, Camera_bn eye position) exactly like the followed player
-// sees.
+// Assigning this (local) controller to the followed pawn's Controller opens
+// the native FP gate (ShouldBeFirstPersonThisTick). Pawn.Controller is
+// owner-only replicated, so it never leaves this machine and the server keeps
+// authority. Local on purpose: effect playback branches on
+// IsLocallyControlled(), non-local stand-ins suppress tracers/explosions.
+// Wants3P() is false because our FP module doesn't derive from
+// TgCameraModule_ThirdPerson, so the engine builds the full native FP rig.
 simulated function UpdateFirstPersonNudge()
 {
     local TgPawn ViewPawn;
@@ -119,8 +112,7 @@ simulated function UpdateFirstPersonNudge()
     }
 
     ViewPawn = TgPawn(GetViewTarget());
-    // Never touch pawns we have authority over (listen server): the fake
-    // Controller assignment is only safe on simulated proxies.
+    // Fake Controller assignment only safe on simulated proxies (listen server owns the pawn).
     if (ViewPawn == none || !ViewPawn.IsAliveAndWell() || ViewPawn.Role >= ROLE_Authority)
     {
         ClearFirstPersonNudge();
@@ -134,13 +126,10 @@ simulated function UpdateFirstPersonNudge()
     ViewPawn.Controller = self;
     m_bBehindView = false;
 
-    // Mounts have no native signal in a spectator context (their posture is
-    // pushed on the owning player's controller only, and the gate's device
-    // loop cannot see them), so detect them from replicated pawn state. The
-    // native r_bIsMounted replication handler also refuses to build the horse
-    // while the pawn looks locally controlled, so the mount presentation is
-    // driven manually - strictly on transitions, otherwise the dismount
-    // presentation would replay every frame.
+    // Mounts: no spectator signal (posture lives on the owning player's
+    // controller) and the native r_bIsMounted handler won't build the horse
+    // for locally controlled pawns, so drive the effects manually off
+    // r_bIsMounted - transitions only, else dismount replays every frame.
     if (ViewPawn.r_bIsMounted != m_bWasMounted)
     {
         m_bWasMounted = ViewPawn.r_bIsMounted;
@@ -163,18 +152,9 @@ simulated function UpdateFirstPersonNudge()
 
 //TODO Cinnamon: Find a better way to do this
 
-// Some movement abilities never close the native gate, and DEVICE OBJECTS do
-// not replicate to spectators at all (GetDeviceByEqPoint resolves to none on
-// this connection - verified by diagnostics). What does replicate is the form
-// STATE NAME per equip point plus the pawn class itself, so third person
-// windows are driven by a per-champion slot table.
-//
-// Champion internal class names: Cassie=TgPawn_Cassie, Lian=TgPawn_Princess,
-// Ash=TgPawn_Juggernaut(unverified), Barik=TgPawn_Barik,
-// Fernando=TgPawn_Fernando, Makoa=TgPawn_Makoa, Androxus=TgPawn_Androxus,
-// Evie=TgPawn_Evie, Zhin=TgPawn_Darklord, Grohk=TgPawn_Grohk,
-// Maeve=TgPawn_Blades, Willo=TgPawn_Fairy, Sha Lin=TgPawn_Longbow,
-// Seris/Torvald=TgPawn_Oracle(?).
+// Device objects don't replicate to spectators (GetDeviceByEqPoint is none
+// here), but c_EquipFormState per equip point does. So 3P windows come from
+// per-champion equip point tables instead of device checks.
 simulated function bool IsForced3PAbilityDevice(TgPawn ViewPawn)
 {
     local int Mask;
