@@ -15,11 +15,7 @@ var transient int bBorderBuilt;
 
 // Pawn currently forced into the client-side first person rig, if any.
 var transient TgPawn m_NudgedFpPawn;
-// Task force of the followed player (team-relative rendering follows it).
-var transient int m_nFollowedTaskForce;
-
-// Last known mounted state of the nudged pawn (edge detection for the
-// manual mount presentation).
+// Last known mounted state of the nudged pawn (edge detection for the manual mount presentation).
 var transient bool m_bWasMounted;
 // True while inside a mount/emote third person window.
 var transient bool m_bWasWindow3P;
@@ -113,18 +109,6 @@ simulated function UpdateFirstPersonNudge()
     ViewPawn.Controller = self;
     m_bBehindView = false;
 
-    // Outline colors, nameplates and friendly/enemy classification resolve
-    // through the controller's PRI now that we are attached. Follow the
-    // viewed player's task force so the spectator sees teams exactly like
-    // they do.
-    FollowedPRI = TgRepInfo_Player(ViewPawn.PlayerReplicationInfo);
-    if (FollowedPRI != none && CachedPRI != none
-        && int(FollowedPRI.GetTaskForceNumber()) != m_nFollowedTaskForce)
-    {
-        m_nFollowedTaskForce = int(FollowedPRI.GetTaskForceNumber());
-        CachedPRI.SetTaskForceNumber(byte(m_nFollowedTaskForce));
-    }
-
     // Mounts have no native signal in a spectator context (their posture is
     // pushed on the owning player's controller only, and the gate's device
     // loop cannot see them), so detect them from replicated pawn state. The
@@ -140,6 +124,7 @@ simulated function UpdateFirstPersonNudge()
         else
             ViewPawn.StopMountingEffects(true, ViewPawn.r_bUseMountPosture);
     }
+
 
     bNativeFP = !ViewPawn.r_bIsMounted
         && !IsForced3PAbilityDevice(ViewPawn)
@@ -169,16 +154,22 @@ simulated function bool IsForced3PAbilityDevice(TgPawn ViewPawn)
 {
     local int Mask;
 
-    // Bit 4 = F ability, bit 3 = Q ability, bit 2 = E ultimate.
+    //Cinnamon: 7 = emote. Handle emotes before anything else.
+    if (ViewPawn.c_EquipFormState[7] == 'DeviceFiring' || ViewPawn.c_EquipFormState[7] == 'DeviceBuilding') 
+        return true;
+
+    // Bit 16 = RMB ability, bit 4 = F ability, bit 3 = Q ability, bit 2 = E ability.
     Mask = GetForce3PSlotMask(ViewPawn) | GetForce3PUltSlotMask(ViewPawn);
     if (Mask == 0)
         return false;
-
-    if ((Mask & (1 << 4)) != 0 && ViewPawn.c_EquipFormState[4] == 'DeviceFiring')
+    
+    if ((Mask & (1 << 16)) != 0 && (ViewPawn.c_EquipFormState[16] == 'DeviceFiring' || ViewPawn.c_EquipFormState[16] == 'DeviceBuilding'))
         return true;
-    if ((Mask & (1 << 3)) != 0 && ViewPawn.c_EquipFormState[3] == 'DeviceFiring')
+    if ((Mask & (1 << 4)) != 0 && (ViewPawn.c_EquipFormState[4] == 'DeviceFiring' || ViewPawn.c_EquipFormState[4] == 'DeviceBuilding'))
         return true;
-    if ((Mask & (1 << 2)) != 0 && ViewPawn.c_EquipFormState[2] == 'DeviceFiring')
+    if ((Mask & (1 << 3)) != 0 && (ViewPawn.c_EquipFormState[3] == 'DeviceFiring' || ViewPawn.c_EquipFormState[3] == 'DeviceBuilding'))
+        return true;
+    if ((Mask & (1 << 2)) != 0 && (ViewPawn.c_EquipFormState[2] == 'DeviceFiring' || ViewPawn.c_EquipFormState[2] == 'DeviceBuilding'))
         return true;
     return false;
 }
@@ -217,10 +208,13 @@ simulated function int GetForce3PSlotMask(TgPawn ViewPawn)
     // Koga=Ninja, Furia=Angel, Dredge=Pirate, Ying=Illusionist,
     // Khan=Vanguard. Old export aliases kept as fallbacks where they exist.
 
-    // Fernando and Zhin force third person on both F and Q.
-    if (ViewPawn.IsA('TgPawn_Knight') || ViewPawn.IsA('TgPawn_Fernando')
-        || ViewPawn.IsA('TgPawn_Darklord'))
+    // Zhin forces third person on both F and Q.
+    if (ViewPawn.IsA('TgPawn_Darklord'))
         return (1 << 4) | (1 << 3);
+
+    // Fernando forces it on F and RMB
+    if(ViewPawn.IsA('TgPawn_Fernando') || ViewPawn.IsA('TgPawn_Knight'))
+        return (1 << 4) | (1 << 16);
 
     // Androxus forces it on Q only.
     if (ViewPawn.IsA('TgPawn_Androxus'))
@@ -237,7 +231,8 @@ simulated function int GetForce3PSlotMask(TgPawn ViewPawn)
         || ViewPawn.IsA('TgPawn_Shaman')       // Grohk
         || ViewPawn.IsA('TgPawn_Grohk')        // (old alias)
         || ViewPawn.IsA('TgPawn_Mage')         // Evie
-        || ViewPawn.IsA('TgPawn_Evie'))        // (old alias)
+        || ViewPawn.IsA('TgPawn_Evie')         // (old alias)
+        || ViewPawn.IsA('TgPawn_Fairy'))       // Willo
         return (1 << 4);
 
     // Tyra, Viktor, Sha Lin, Bomb King, Drogoz, Kinessa, Inara, Ruckus,
@@ -398,10 +393,6 @@ simulated function ClearFirstPersonNudge()
     Nudged = m_NudgedFpPawn;
     m_NudgedFpPawn = none;
     m_bWasMounted = false;
-    // Restore the spectator's default task force.
-    if (m_nFollowedTaskForce != 0 && CachedPRI != none)
-        CachedPRI.SetTaskForceNumber(1);
-    m_nFollowedTaskForce = 0;
 
     SetRealModelHidden(Nudged, false);
     SetRigVisible(Nudged, true);
