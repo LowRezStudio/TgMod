@@ -53,6 +53,8 @@ static function SetupCM(TgPlayerController PC) {
 }
 
 static function TgGfxScene FindSceneByClassName(TgGameHUD H, name ClassName) {
+    local TgClientHUD CH;
+    local UIGameMoviePlayer P;
     local TgGfxScene Found;
     local int i;
 
@@ -70,6 +72,18 @@ static function TgGfxScene FindSceneByClassName(TgGameHUD H, name ClassName) {
         Found = FindSceneByClassWalk(H.m_PopupStack[i], ClassName);
         if (Found != none) {
             return Found;
+        }
+    }
+    // All HUD scenes live on the movie player (UIHudCards/UIHudSkills/... are MovieScenes entries)
+    CH = H;
+    if (CH != none) {
+        P = CH.m_pMovie;
+        if (P != none) {
+            for (i = 0; i < P.m_Scenes.Length; i++) {
+                if (P.m_Scenes[i] != none && P.m_Scenes[i].Class.Name == ClassName) {
+                    return P.m_Scenes[i];
+                }
+            }
         }
     }
     return none;
