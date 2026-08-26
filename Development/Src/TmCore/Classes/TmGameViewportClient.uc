@@ -39,6 +39,7 @@ function PostRender(Canvas Canvas)
         TmSpectatorController(PC).TickSpectatorPlayerHUD();
         TmSpectatorController(PC).TickSpectatorTeamHUD();
         TmSpectatorController(PC).TickBurnsHud();
+        TmSpectatorController(PC).TickAbilitiesHud();
     }
 }
 
