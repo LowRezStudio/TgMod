@@ -18,6 +18,15 @@ var transient bool bClonedHUD;
 var transient int LastClonedTickCount;
 var transient int bBorderBuilt;
 
+// Pawn currently forced into the client-side first person rig, if any.
+var transient TgPawn m_NudgedFpPawn;
+// Last known mounted state of the nudged pawn (edge detection for the manual mount presentation).
+var transient bool m_bWasMounted;
+// True while inside a mount/emote third person window.
+var transient bool m_bWasWindow3P;
+// If false, disable the server-side relevancy viewpoint override.
+var config bool c_bTrackViewTargetForRelevancy;
+
 var transient int LastUltPhase;  // previous tick's ult phase (1=charging, 2=full) for pulse edge detection
 var transient float UltRingNext; // client TimeSeconds for the next recurring ready-ring flash
 
@@ -53,8 +62,329 @@ public function Class<HUD> GetHudClass(Class<HUD> pNewHudType)
     return Class'TgClient.TgGameHUD';
 }
 
+exec function SpecToggleFirstPerson()
+{
+    if (int(m_CameraMode) == int(SpectatorCameraMode.SpecCam_FollowFirstPerson))
+        SetSpectatorCameraMode(SpectatorCameraMode.SpecCam_FollowThirdPerson);
+    else
+        SetSpectatorCameraMode(SpectatorCameraMode.SpecCam_FollowFirstPerson);
+}
+
+// Same bookkeeping as the stock mode 3 handler, but swaps in our own camera
+// module so the POV is driven from script instead of the native gate.
+exec function SetSpectatorCameraMode(TgSpectatorController.SpectatorCameraMode Mode, optional bool bCameraTween = false)
+{
+    if (int(Mode) != int(SpectatorCameraMode.SpecCam_FollowFirstPerson))
+    {
+        super.SetSpectatorCameraMode(Mode, bCameraTween);
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    if (int(Mode) == int(m_CameraMode))
+        return;
+
+    m_CameraMode = Mode;
+    m_bIsMapSquashed = false;
+    if (bCameraTween)
+        TgPlayerCamera(PlayerCamera).SwitchCameras(class'TmCore.TmCameraModule_SpectatorFirstPerson', 0.2);
+    else
+        TgPlayerCamera(PlayerCamera).SwitchCameras(class'TmCore.TmCameraModule_SpectatorFirstPerson');
+}
+
+// Assigning this (local) controller to the followed pawn's Controller opens
+// the native FP gate (ShouldBeFirstPersonThisTick). Pawn.Controller is
+// owner-only replicated, so it never leaves this machine and the server keeps
+// authority. Local on purpose: effect playback branches on
+// IsLocallyControlled(), non-local stand-ins suppress tracers/explosions.
+// Wants3P() is false because our FP module doesn't derive from
+// TgCameraModule_ThirdPerson, so the engine builds the full native FP rig.
+simulated function UpdateFirstPersonNudge()
+{
+    local TgPawn ViewPawn;
+    local TgRepInfo_Player FollowedPRI;
+    local bool bNativeFP;
+
+    if (m_CameraMode != SpectatorCameraMode.SpecCam_FollowFirstPerson)
+    {
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    ViewPawn = TgPawn(GetViewTarget());
+    // Fake Controller assignment only safe on simulated proxies (listen server owns the pawn).
+    if (ViewPawn == none || !ViewPawn.IsAliveAndWell() || ViewPawn.Role >= ROLE_Authority)
+    {
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    if (m_NudgedFpPawn != none && m_NudgedFpPawn != ViewPawn)
+        ClearFirstPersonNudge();
+
+    m_NudgedFpPawn = ViewPawn;
+    ViewPawn.Controller = self;
+    m_bBehindView = false;
+
+    // Mounts: no spectator signal (posture lives on the owning player's
+    // controller) and the native r_bIsMounted handler won't build the horse
+    // for locally controlled pawns, so drive the effects manually off
+    // r_bIsMounted - transitions only, else dismount replays every frame.
+    if (ViewPawn.r_bIsMounted != m_bWasMounted)
+    {
+        m_bWasMounted = ViewPawn.r_bIsMounted;
+        if (ViewPawn.r_bIsMounted)
+            ViewPawn.PlayMountingEffects(false, ViewPawn.r_bUseMountPosture);
+        else
+            ViewPawn.StopMountingEffects(true, ViewPawn.r_bUseMountPosture);
+    }
+
+
+    bNativeFP = !ViewPawn.r_bIsMounted
+        && !IsForced3PAbilityDevice(ViewPawn)
+        && ViewPawn.ShouldBeFirstPersonThisTick();
+    m_bBehindView = !bNativeFP;
+
+    SetRealModelHidden(ViewPawn, bNativeFP);
+    SetRigVisible(ViewPawn, bNativeFP);
+    SetForced3PPose(!bNativeFP);
+}
+
+//TODO Cinnamon: Find a better way to do this
+
+// Device objects don't replicate to spectators (GetDeviceByEqPoint is none
+// here), but c_EquipFormState per equip point does. So 3P windows come from
+// per-champion equip point tables instead of device checks.
+simulated function bool IsForced3PAbilityDevice(TgPawn ViewPawn)
+{
+    local int Mask;
+
+    //Cinnamon: 7 = emote. Handle emotes before anything else.
+    if (ViewPawn.c_EquipFormState[7] == 'DeviceFiring' || ViewPawn.c_EquipFormState[7] == 'DeviceBuilding') 
+        return true;
+
+    // Bit 16 = RMB ability, bit 4 = F ability, bit 3 = Q ability, bit 2 = E ability.
+    Mask = GetForce3PSlotMask(ViewPawn) | GetForce3PUltSlotMask(ViewPawn);
+    if (Mask == 0)
+        return false;
+    
+    if ((Mask & (1 << 16)) != 0 && (ViewPawn.c_EquipFormState[16] == 'DeviceFiring' || ViewPawn.c_EquipFormState[16] == 'DeviceBuilding'))
+        return true;
+    if ((Mask & (1 << 4)) != 0 && (ViewPawn.c_EquipFormState[4] == 'DeviceFiring' || ViewPawn.c_EquipFormState[4] == 'DeviceBuilding'))
+        return true;
+    if ((Mask & (1 << 3)) != 0 && (ViewPawn.c_EquipFormState[3] == 'DeviceFiring' || ViewPawn.c_EquipFormState[3] == 'DeviceBuilding'))
+        return true;
+    if ((Mask & (1 << 2)) != 0 && (ViewPawn.c_EquipFormState[2] == 'DeviceFiring' || ViewPawn.c_EquipFormState[2] == 'DeviceBuilding'))
+        return true;
+    return false;
+}
+
+//TODO Cinnamon: Find a better way to do this
+
+// Ultimates (equip point 2) that play out in third person. Jenos' Through
+// Time and Space already closes the gate natively and needs no entry.
+simulated function int GetForce3PUltSlotMask(TgPawn ViewPawn)
+{
+    if (ViewPawn.IsA('TgPawn_Princess')       // Lian
+        || ViewPawn.IsA('TgPawn_Flak')        // Ash
+        || ViewPawn.IsA('TgPawn_Knight')      // Fernando
+        || ViewPawn.IsA('TgPawn_Darklord')    // Zhin
+        || ViewPawn.IsA('TgPawn_Shaman')      // Grohk
+        || ViewPawn.IsA('TgPawn_BombKing')    // Bomb King
+        || ViewPawn.IsA('TgPawn_Drogoz')      // Drogoz
+        || ViewPawn.IsA('TgPawn_BarrierTank') // Inara
+        || ViewPawn.IsA('TgPawn_Druid'))      // Grover
+        return 1 << 2;
+
+    return 0;
+}
+
+
+//TODO Cinnamon: Find a better way to do this
+simulated function int GetForce3PSlotMask(TgPawn ViewPawn)
+{
+    // Champion internal class names (runtime): Cassie=Huntress,
+    // Fernando=Knight, Barik=Engineer, Grohk=Shaman, Evie=Mage,
+    // Lian=Princess, Ash=Flak, Makoa=Makoa, Androxus=Androxus,
+    // Zhin=Darklord, Maeve=Blades, Willo=Fairy, Sha Lin=Longbow,
+    // Seris=Oracle, Strix=Owl, Inara=BarrierTank, Terminus=Lazarus,
+    // Tyra=Salty, Viktor=BRmale/Robosarge, Pip=Alchemist, Vivian=Churchill,
+    // Moji=Rider, Lex=Lawman, Grover=Druid, Atlas=TimeTraveler,
+    // Koga=Ninja, Furia=Angel, Dredge=Pirate, Ying=Illusionist,
+    // Khan=Vanguard. Old export aliases kept as fallbacks where they exist.
+
+    // Zhin forces third person on both F and Q.
+    if (ViewPawn.IsA('TgPawn_Darklord'))
+        return (1 << 4) | (1 << 3);
+
+    // Fernando forces it on F and RMB
+    if(ViewPawn.IsA('TgPawn_Fernando') || ViewPawn.IsA('TgPawn_Knight'))
+        return (1 << 4) | (1 << 16);
+
+    // Androxus forces it on Q only.
+    if (ViewPawn.IsA('TgPawn_Androxus'))
+        return (1 << 3);
+
+    // Everyone else with a forcing ability uses F only.
+    if (ViewPawn.IsA('TgPawn_Huntress')        // Cassie dodge roll
+        || ViewPawn.IsA('TgPawn_Cassie')       // (old alias)
+        || ViewPawn.IsA('TgPawn_Princess')     // Lian
+        || ViewPawn.IsA('TgPawn_Flak')         // Ash
+        || ViewPawn.IsA('TgPawn_Engineer')     // Barik
+        || ViewPawn.IsA('TgPawn_Barik')        // (old alias)
+        || ViewPawn.IsA('TgPawn_Makoa')        // Makoa
+        || ViewPawn.IsA('TgPawn_Shaman')       // Grohk
+        || ViewPawn.IsA('TgPawn_Grohk')        // (old alias)
+        || ViewPawn.IsA('TgPawn_Mage')         // Evie
+        || ViewPawn.IsA('TgPawn_Evie')         // (old alias)
+        || ViewPawn.IsA('TgPawn_Fairy'))       // Willo
+        return (1 << 4);
+
+    // Tyra, Viktor, Sha Lin, Bomb King, Drogoz, Kinessa, Inara, Ruckus,
+    // Torvald, Buck, Lex, Maeve, Skye, Grover, Seris, Ying, Strix: none.
+    return 0;
+}
+simulated function SetForced3PPose(bool bForced3P)
+{
+    local TmCameraModule_SpectatorFirstPerson CamMod;
+
+    if (PlayerCamera == none)
+        return;
+    CamMod = TmCameraModule_SpectatorFirstPerson(TgPlayerCamera(PlayerCamera).CurrentCameraMod);
+    if (CamMod != none)
+        CamMod.SetForced3P(bForced3P);
+}
+
+// Hiding must be absolute and survive ATgPawn::TickSpecial, which re-asserts
+// mesh visibility every tick via RecursiveSetVisibility (derived from
+// bOwnerNoSee-style flags that cannot work here: Owner is not replicated to
+// spectators, so the engine never considers the pawn's meshes owned by us).
+// Setting the actor-level bHidden wins that race: rendering honors the owning
+// actor's hidden flag regardless of per-component flips. The mount mesh is
+// deliberately skipped: PlayMountingEffects/StopMountingEffects own its
+// lifecycle, and blanket-unhiding would resurrect a stale horse during later
+// third person ticks.
+simulated function SetRealModelHidden(TgPawn ViewPawn, bool bHidden)
+{
+    local PrimitiveComponent Prim;
+
+    ViewPawn.SetHidden(bHidden);
+    foreach ViewPawn.ComponentList(class'PrimitiveComponent', Prim)
+    {
+        if (!bHidden && Prim == ViewPawn.m_MountMesh)
+            continue;
+        Prim.SetHidden(bHidden);
+    }
+}
+
+// Park or restore the first person viewmodel for third person ticks. The
+// native gate stays open there, so its per-tick toggles (OwnerNoSee based)
+// keep flipping state; absolute SetHidden sticks instead. Overlay duplicates
+// and particles attached to the rig are handled too, otherwise weapon glow
+// effects keep rendering over a hidden mesh.
+simulated function SetRigVisible(TgPawn ViewPawn, bool bVisible)
+{
+    local TgWeaponMeshActor WMA;
+    local PrimitiveComponent Prim;
+    local int i;
+
+    WMA = ViewPawn.m_WeaponMesh;
+    if (WMA == none)
+        return;
+
+    if (bVisible)
+    {
+        // Restore the first person pieces plus everything owned by the rig
+        // (weapon glow particles live here); the 3P weapon is left to the
+        // native owner-based visibility, which now applies to us.
+        foreach WMA.AllOwnedComponents(class'PrimitiveComponent', Prim)
+            Prim.SetHidden(false);
+        if (WMA.m_WeaponMesh1P != none)
+            WMA.m_WeaponMesh1P.FxActivateGroup('AlwaysOn', 0);
+        if (WMA.m_HandsMesh != none)
+            WMA.m_HandsMesh.FxActivateGroup('AlwaysOn', 0);
+        if (WMA.m_HeadMesh1P != none)
+            WMA.m_HeadMesh1P.FxActivateGroup('AlwaysOn', 0);
+        SetRigOverlaysVisible(ViewPawn, true);
+        return;
+    }
+
+    // Park everything weapon related for third person ticks.
+    WMA.Set1PAttachState(2);
+    if (WMA.m_WeaponMesh1P != none)
+    {
+        WMA.m_WeaponMesh1P.SetHidden(true);
+        WMA.m_WeaponMesh1P.FxDeactivateGroup('AlwaysOn', 0);
+    }
+    if (WMA.m_HandsMesh != none)
+    {
+        WMA.m_HandsMesh.SetHidden(true);
+        WMA.m_HandsMesh.FxDeactivateGroup('AlwaysOn', 0);
+    }
+    if (WMA.m_HeadMesh1P != none)
+    {
+        WMA.m_HeadMesh1P.SetHidden(true);
+        WMA.m_HeadMesh1P.FxDeactivateGroup('AlwaysOn', 0);
+    }
+    if (WMA.m_WeaponMesh3P != none)
+        WMA.m_WeaponMesh3P.SetHidden(true);
+
+    // Particles parented to the rig render independently of their parent's
+    // hidden flag, and they can live anywhere in the ownership chain (the
+    // weapon glows do), so sweep everything the rig owns.
+    foreach WMA.AllOwnedComponents(class'PrimitiveComponent', Prim)
+        Prim.SetHidden(true);
+
+    SetRigOverlaysVisible(ViewPawn, false);
+}
+
+// Hides/shows the overlay duplicate meshes parented to the first person
+// pieces (skin/shield overlays render independently of their parent's flag).
+simulated function SetRigOverlaysVisible(TgPawn ViewPawn, bool bVisible)
+{
+    local int i;
+    local TgWeaponMeshActor WMA;
+
+    WMA = ViewPawn.m_WeaponMesh;
+    if (WMA == none)
+        return;
+
+    for (i = 0; i < ViewPawn.m_OverlayInfosBody.Length; i++)
+    {
+        if (ViewPawn.m_OverlayInfosBody[i].ParentMesh == WMA.m_HandsMesh
+            || ViewPawn.m_OverlayInfosBody[i].ParentMesh == WMA.m_HeadMesh1P)
+            ViewPawn.m_OverlayInfosBody[i].OverlayMesh.SetHidden(!bVisible);
+    }
+    for (i = 0; i < ViewPawn.m_OverlayInfosWeapon.Length; i++)
+    {
+        if (ViewPawn.m_OverlayInfosWeapon[i].ParentMesh == WMA.m_WeaponMesh1P)
+            ViewPawn.m_OverlayInfosWeapon[i].OverlayMesh.SetHidden(!bVisible);
+    }
+}
+
+// Server-side actor relevancy (projectiles, deployables, sounds...) is computed
+// from each controller's GetPlayerViewPoint. Flag-gated override that tracks
+// the view target; kept off the hot path when disabled.
+simulated event GetPlayerViewPoint(out Vector out_Location, out Rotator out_Rotation)
+{
+    local Actor VT;
+
+    if (c_bTrackViewTargetForRelevancy && Role == ROLE_Authority && WorldInfo.NetMode != NM_Client)
+    {
+        VT = GetViewTarget();
+        if (VT != none)
+        {
+            out_Location = VT.Location;
+            out_Rotation = VT.Rotation;
+            return;
+        }
+    }
+    super.GetPlayerViewPoint(out_Location, out_Rotation);
+}
+
 function SpectatorSetViewTarget(Actor VT, optional ViewTargetTransitionParams TransitionParams)
 {
+    ClearFirstPersonNudge();
     super.SpectatorSetViewTarget(VT, TransitionParams);
     if (Role == ROLE_Authority)
         SetTimer(0.15, true, 'TickFollowAbilities');
@@ -228,6 +558,25 @@ replication
 {
     if (bNetDirty)
         r_Abilities, r_UltCharge, r_CastIds, r_CastCurMs, r_CastRateMs, r_CastNames;
+}
+
+simulated function ClearFirstPersonNudge()
+{
+    local TgPawn Nudged;
+
+    if (m_NudgedFpPawn == none)
+        return;
+
+    Nudged = m_NudgedFpPawn;
+    m_NudgedFpPawn = none;
+    m_bWasMounted = false;
+
+    SetRealModelHidden(Nudged, false);
+    SetRigVisible(Nudged, true);
+    SetForced3PPose(false);
+    if (Nudged.Controller == self)
+        Nudged.Controller = none;
+    m_bBehindView = true;
 }
 
 simulated function TickBurnsHud()
@@ -451,4 +800,9 @@ simulated function TickSpectatorTeamHUD()
         HUD.Animate(HealthTip, 0.2, UIANIM_X, ((float(Players[i].r_nHealthCurrent) / float(Players[i].r_nHealthMaximum)) * 78) - 39);
         HealthTip.SetAlpha(100.0);
     }
+}
+
+defaultproperties
+{
+    c_bTrackViewTargetForRelevancy=true
 }

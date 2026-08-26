@@ -360,4 +360,6 @@ function SetupSpectator(TmProxyActor ProxyActor, TgPlayerController PC, Incoming
         SPC.SpectatorSetViewTarget(TargetPawn);
 
     ProxyActor.ClientConsoleCommand("setreadytoplay");
+    ProxyActor.ClientConsoleCommand("spectogglefirstperson");
+
 }
