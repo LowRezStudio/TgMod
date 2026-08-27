@@ -29,9 +29,6 @@ simulated reliable client function ClientAddCheats() {
 }
 
 function ServerAddCheats() {
-    if (Role == ROLE_Authority) {
-        ClientAddCheats();
-    }
     ClientAddCheats();
 }
 

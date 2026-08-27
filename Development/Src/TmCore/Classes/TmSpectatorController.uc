@@ -35,6 +35,7 @@ var repnotify TmAbilityState r_Abilities[5];
 var repnotify int r_UltCharge;   // r_nUltimateCharge doesn't reliably replicate to spec clients
 var transient int LastStatus[5]; // previous tick's status for ready-transition flash detection
 var transient int LastIconFrame[5]; // last icon frame written per slot; skips redundant GotoAndStopI/FadeIn
+var transient TgPawn LastSkillsViewPawn; // latches reset whenever the followed pawn changes
 
 // Cast bars (server-sampled), ms precision so the client can extrapolate like the native HUD
 var repnotify int r_CastIds[3];      // device ids currently casting (0 = slot empty)
@@ -92,13 +93,9 @@ exec function SetSpectatorCameraMode(TgSpectatorController.SpectatorCameraMode M
         TgPlayerCamera(PlayerCamera).SwitchCameras(class'TmCore.TmCameraModule_SpectatorFirstPerson');
 }
 
-// Assigning this (local) controller to the followed pawn's Controller opens
-// the native FP gate (ShouldBeFirstPersonThisTick). Pawn.Controller is
-// owner-only replicated, so it never leaves this machine and the server keeps
-// authority. Local on purpose: effect playback branches on
-// IsLocallyControlled(), non-local stand-ins suppress tracers/explosions.
-// Wants3P() is false because our FP module doesn't derive from
-// TgCameraModule_ThirdPerson, so the engine builds the full native FP rig.
+// Assigning this local controller to the pawn opens the native first person
+// gate. Local on purpose: remote stand-ins suppress tracers/explosions, and
+// the assignment never replicates, so the server keeps authority.
 simulated function UpdateFirstPersonNudge()
 {
     local TgPawn ViewPawn;
@@ -126,10 +123,8 @@ simulated function UpdateFirstPersonNudge()
     ViewPawn.Controller = self;
     m_bBehindView = false;
 
-    // Mounts: no spectator signal (posture lives on the owning player's
-    // controller) and the native r_bIsMounted handler won't build the horse
-    // for locally controlled pawns, so drive the effects manually off
-    // r_bIsMounted - transitions only, else dismount replays every frame.
+    // Mounts: drive effects manually off r_bIsMounted, transitions only or
+    // the dismount replays every frame.
     if (ViewPawn.r_bIsMounted != m_bWasMounted)
     {
         m_bWasMounted = ViewPawn.r_bIsMounted;
@@ -152,9 +147,8 @@ simulated function UpdateFirstPersonNudge()
 
 //TODO Cinnamon: Find a better way to do this
 
-// Device objects don't replicate to spectators (GetDeviceByEqPoint is none
-// here), but c_EquipFormState per equip point does. So 3P windows come from
-// per-champion equip point tables instead of device checks.
+// Devices don't replicate to spectators, but c_EquipFormState per equip point
+// does, so third person windows come from tables instead of device checks.
 simulated function bool IsForced3PAbilityDevice(TgPawn ViewPawn)
 {
     local int Mask;
@@ -255,15 +249,9 @@ simulated function SetForced3PPose(bool bForced3P)
         CamMod.SetForced3P(bForced3P);
 }
 
-// Hiding must be absolute and survive ATgPawn::TickSpecial, which re-asserts
-// mesh visibility every tick via RecursiveSetVisibility (derived from
-// bOwnerNoSee-style flags that cannot work here: Owner is not replicated to
-// spectators, so the engine never considers the pawn's meshes owned by us).
-// Setting the actor-level bHidden wins that race: rendering honors the owning
-// actor's hidden flag regardless of per-component flips. The mount mesh is
-// deliberately skipped: PlayMountingEffects/StopMountingEffects own its
-// lifecycle, and blanket-unhiding would resurrect a stale horse during later
-// third person ticks.
+// Actor-level bHidden is absolute and survives the pawn re-asserting
+// per-component visibility every tick. The mount mesh is skipped;
+// PlayMountingEffects owns its lifecycle.
 simulated function SetRealModelHidden(TgPawn ViewPawn, bool bHidden)
 {
     local PrimitiveComponent Prim;
@@ -277,11 +265,8 @@ simulated function SetRealModelHidden(TgPawn ViewPawn, bool bHidden)
     }
 }
 
-// Park or restore the first person viewmodel for third person ticks. The
-// native gate stays open there, so its per-tick toggles (OwnerNoSee based)
-// keep flipping state; absolute SetHidden sticks instead. Overlay duplicates
-// and particles attached to the rig are handled too, otherwise weapon glow
-// effects keep rendering over a hidden mesh.
+// Park or restore the first person rig for third person ticks. Native
+// OwnerNoSee toggles keep flipping state, so absolute SetHidden sticks.
 simulated function SetRigVisible(TgPawn ViewPawn, bool bVisible)
 {
     local TgWeaponMeshActor WMA;
@@ -294,9 +279,7 @@ simulated function SetRigVisible(TgPawn ViewPawn, bool bVisible)
 
     if (bVisible)
     {
-        // Restore the first person pieces plus everything owned by the rig
-        // (weapon glow particles live here); the 3P weapon is left to the
-        // native owner-based visibility, which now applies to us.
+        // Restore the rig plus everything it owns (weapon glows live there).
         foreach WMA.AllOwnedComponents(class'PrimitiveComponent', Prim)
             Prim.SetHidden(false);
         if (WMA.m_WeaponMesh1P != none)
@@ -329,9 +312,7 @@ simulated function SetRigVisible(TgPawn ViewPawn, bool bVisible)
     if (WMA.m_WeaponMesh3P != none)
         WMA.m_WeaponMesh3P.SetHidden(true);
 
-    // Particles parented to the rig render independently of their parent's
-    // hidden flag, and they can live anywhere in the ownership chain (the
-    // weapon glows do), so sweep everything the rig owns.
+    // Particles ignore their parent's hidden flag, so sweep everything the rig owns.
     foreach WMA.AllOwnedComponents(class'PrimitiveComponent', Prim)
         Prim.SetHidden(true);
 
@@ -362,9 +343,8 @@ simulated function SetRigOverlaysVisible(TgPawn ViewPawn, bool bVisible)
     }
 }
 
-// Server-side actor relevancy (projectiles, deployables, sounds...) is computed
-// from each controller's GetPlayerViewPoint. Flag-gated override that tracks
-// the view target; kept off the hot path when disabled.
+// Relevancy is computed from GetPlayerViewPoint; flag-gated override to track
+// the view target instead.
 simulated event GetPlayerViewPoint(out Vector out_Location, out Rotator out_Rotation)
 {
     local Actor VT;
@@ -387,7 +367,10 @@ function SpectatorSetViewTarget(Actor VT, optional ViewTargetTransitionParams Tr
     ClearFirstPersonNudge();
     super.SpectatorSetViewTarget(VT, TransitionParams);
     if (Role == ROLE_Authority)
+    {
+        TickFollowAbilities(); // sample the new target now; r_Abilities still holds the old one
         SetTimer(0.15, true, 'TickFollowAbilities');
+    }
 }
 
 function TickFollowAbilities()
@@ -430,7 +413,8 @@ function TickFollowAbilities()
             {
                 S[i].Status = 4; // active -> icon spinner
             }
-            else if (Dev.IsDeviceCoolingDown())
+            // Only abilities get the cooldown sweep; weapons cool between shots.
+            else if (Dev.IsAbility() && Dev.IsDeviceCoolingDown())
             {
                 S[i].Status = 3; // cooling
                 Remaining = Dev.GetCooldownRemaining();
@@ -617,6 +601,22 @@ simulated function TickAbilitiesHud()
     ViewPawn = TgPawn(GetViewTarget());
     if (ViewPawn == none && PlayerCamera != none)
         ViewPawn = TgPawn(PlayerCamera.PendingViewTarget.Target); // mid-transition lock
+
+    // Target switch: drop per-target latches or the first paint uses stale state.
+    if (ViewPawn != LastSkillsViewPawn)
+    {
+        LastSkillsViewPawn = ViewPawn;
+        for (i = 0; i < 5; i++)
+        {
+            LastStatus[i] = 0;
+            LastIconFrame[i] = 0;
+        }
+        LastUltPhase = 0;
+        UltRingNext = 0.0;
+        for (i = 0; i < 3; i++)
+            CastShown[i] = 0;
+    }
+
     if (ViewPawn == none)
     {
         // No target: blank slots, reset latches so next target gets fresh icons
@@ -773,8 +773,9 @@ simulated function TickSpectatorTeamHUD()
     local TgPawn ViewPawn;
     local TgRepInfo_Player PRI, SPRI;
     local array<TgRepInfo_Player> Players;
-    local GFxObject RedPlayer, Health, HealthBG, HealthTip;
-    local int i;
+    local GFxObject RedPlayer, Health, HealthBG, HealthTip, UltText, UltReady;
+    local float HpPct;
+    local int i, Charge, bFull;
 
     TgRepInfo_Game(WorldInfo.GRI).GetTaskForce(2).GetPlayers(Players);
     HUD = UIHudTeam(`UTILS.FindSceneByClassName(TgGameHUD(myHUD), 'UIHudTeam'));
@@ -794,11 +795,49 @@ simulated function TickSpectatorTeamHUD()
         HealthBG.SetVisible(true);
         HealthBG.SetAlpha(85.0);
         Health.SetVisible(true);
-        HUD.Animate(Health, 0.2, UIANIM_WIDTH, (float(Players[i].r_nHealthCurrent) / float(Players[i].r_nHealthMaximum)) * 78);
+        HpPct = Players[i].r_nHealthMaximum > 0 ? float(Players[i].r_nHealthCurrent) / float(Players[i].r_nHealthMaximum) : 0.0;
+        HUD.Animate(Health, 0.2, UIANIM_WIDTH, HpPct * 78);
         Health.SetAlpha(100.0);
-        HealthTip.SetVisible(true);
-        HUD.Animate(HealthTip, 0.2, UIANIM_X, ((float(Players[i].r_nHealthCurrent) / float(Players[i].r_nHealthMaximum)) * 78) - 39);
-        HealthTip.SetAlpha(100.0);
+        // Tip rides the bar edge; hidden at 0 health, like native.
+        if (Players[i].r_nHealthCurrent > 0 && HealthTip != none)
+        {
+            HealthTip.SetVisible(true);
+            HUD.Animate(HealthTip, 0.2, UIANIM_X, (HpPct * 78) - 39);
+            HealthTip.SetAlpha(100.0);
+        }
+        else if (HealthTip != none && HealthTip.GetBool("_visible"))
+            HealthTip.SetVisible(false);
+
+        // Ult = base icon + charge text, always shown. UltReady = glow, only at
+        // full. Native TickPlayers also writes these rows (it fades Ult out at
+        // charge 0), so Ult gets snapped visible instead of faded. The glow
+        // fades, but never mid-fade; restarting one per tick makes it pulse.
+        if (i < 5)
+        {
+            Charge = Players[i].r_nUltimateCharge;
+            UltText = RedPlayer.GetObject("Ult");
+            UltReady = RedPlayer.GetObject("UltReady");
+            bFull = Charge >= 100 ? 1 : 0;
+            if (UltText != none)
+            {
+                UltText.SetVisible(true);
+                UltText.SetAlpha(100.0);
+                `UIUTILS.SetGameText(UltText, string(Clamp(Charge, 0, 100)) $ "%");
+            }
+            if (UltReady != none && !HUD.IsAnimatingType(UltReady, UIANIM_ALPHA))
+            {
+                if (bFull == 1 && UltReady.GetFloat("_alpha") < 99.0)
+                {
+                    HUD.CancelAnim(UltReady);
+                    HUD.FadeIn(UltReady, 0.25);
+                }
+                else if (bFull == 0 && UltReady.GetFloat("_alpha") > 1.0)
+                {
+                    HUD.CancelAnim(UltReady);
+                    HUD.FadeOut(UltReady, 0.25);
+                }
+            }
+        }
     }
 }
 
