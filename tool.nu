@@ -145,13 +145,13 @@ $bundle_spec.files | items {|k, v|
 try { rm -r $tempest_mod_path } catch {}
 7z a -tzip $tempest_mod_path ($bundle_path | path join "*") | ignore
 
+print $bundle_spec.files
+
 # Stream the hash through an external instead of `open`ing the 1.8GB installer
 # into nu's memory (Defender live-scanning on CI makes that look like a hang).
-# All three tools print lowercase hex, so no case-normalization is needed
-# (and none is used: `str downcase`/`str lowercase` differ across nu versions).
 def sha256-of [path: string] {
     match ($nu.os-info.name) {
-        "windows" => { ^certutil -hashfile $path SHA256 | lines | where {|l| ($l | str trim) =~ '^[0-9a-fA-F]{64}$' } | first }
+        "windows" => { ^certutil -hashfile $path SHA256 | lines | where {|l| ($l | str trim) =~ '^[0-9a-fA-F]{64}$' } | first | str lowercase }
         "macos" => { ^shasum -a 256 $path | split row " " | first }
         _ => { ^sha256sum $path | split row " " | first }
     }
