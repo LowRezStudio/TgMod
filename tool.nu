@@ -20,8 +20,6 @@ if not ($env.PWD | path join "Binaries" | path exists) {
     let cached = ($install_path | path exists) and (sha256-of $install_path) == $checksum_sha256
 
     if not $cached {
-        mkdir $nu.cache-dir
-
         let r2_creds_set = not (($env.R2_ACCESS_KEY_ID? | is-empty) or ($env.R2_SECRET_ACCESS_KEY? | is-empty) or ($env.R2_ENDPOINT? | is-empty))
 
         mut downloaded = false
@@ -103,19 +101,10 @@ if not ($env.PWD | path join "Binaries" | path exists) {
     }
 }
 
-if 'TG_SKIP_MAKE' not-in $env {
-    print $"Running UDK make in ($env.PWD)..."
-    windows ./Binaries/Win64/UDK.com make -unattended
-    print "UDK make done"
-} else {
-    print "TG_SKIP_MAKE set - skipping make"
-}
-
 mkdir $output_path
 try { rm -r $bundle_path } catch {}
 mkdir $bundle_path
 
-print $bundle_spec.files
 $bundle_spec.files | items {|k, v|
     let matched_sources = (glob $k)
 
@@ -156,7 +145,7 @@ try { rm -r $tempest_mod_path } catch {}
 # into nu's memory (Defender live-scanning on CI makes that look like a hang).
 def sha256-of [path: string] {
     match ($nu.os-info.name) {
-        "windows" => { ^certutil -hashfile $path SHA256 | lines | where {|l| ($l | str trim) =~ '^[0-9a-fA-F]{64}$' } | first | str downcase }
+        "windows" => { ^certutil -hashfile $path SHA256 | lines | where {|l| ($l | str trim) =~ '^[0-9a-fA-F]{64}$' } | first | str lowercase }
         "macos" => { ^shasum -a 256 $path | split row " " | first }
         _ => { ^sha256sum $path | split row " " | first }
     }
