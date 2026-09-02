@@ -115,7 +115,7 @@ $bundle_spec.files | items {|k, v|
 
         # path expand yields backslashes on windows while $env.PWD uses
         # forward slashes, so normalize before comparing
-        if not (($resolved_source | str replace -a '\\' '/') | str starts-with ($env.PWD | str replace -a '\\' '/')) {
+        if not (($resolved_source | str replace -a '\' '/') | str starts-with ($env.PWD | str replace -a '\' '/')) {
             error make {
                 msg: "Security Violation: Path traversal detected after expansion",
                 label: {
