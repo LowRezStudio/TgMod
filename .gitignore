@@ -7,6 +7,8 @@
 !tool/**
 !manifest.toml
 !README.md
+!.github/
+!.github/**
 !exported/
 !exported/**
 !Config/
