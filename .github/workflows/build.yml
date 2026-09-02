@@ -119,7 +119,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="v${{ steps.mod_version.outputs.version }}-${{ github.run_number }}"
-          TITLE="Tempest Core ${{ steps.mod_version.outputs.version }} (run ${{ github.run_number }})"
+          TITLE="Tempest Core ${{ steps.mod_version.outputs.version }}-(${{ github.run_number }})"
           # Run numbers are unique per workflow but reused on rerun: if the
           # release already exists we just refresh its asset instead of failing.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
