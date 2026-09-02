@@ -113,7 +113,9 @@ $bundle_spec.files | items {|k, v|
     for source in $matched_sources {
         let resolved_source = ($source | path expand)
 
-        if not ($resolved_source | str starts-with $env.PWD) {
+        # path expand yields backslashes on windows while $env.PWD uses
+        # forward slashes, so normalize before comparing
+        if not (($resolved_source | str replace -a '\\' '/') | str starts-with ($env.PWD | str replace -a '\\' '/')) {
             error make {
                 msg: "Security Violation: Path traversal detected after expansion",
                 label: {
