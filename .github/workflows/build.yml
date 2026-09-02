@@ -21,30 +21,21 @@ jobs:
       - name: Install Nushell
         uses: hustcer/setup-nu@v3
         with:
-          version: "0.101.0"
+          version: latest
 
       - name: Resolve Nu cache dir
         id: nu_cache_dir
         shell: bash
         run: echo "path=$(nu -c '$nu.cache-dir')" >> "$GITHUB_OUTPUT"
 
+      # Static key on purpose: the installer itself never changes, and tool.nu
+      # verifies its checksum on every cache hit anyway. Keying on
+      # hashFiles('tool.nu') would bust the cache on every tool.nu edit.
       - name: Cache UDK installer download
         uses: actions/cache@v4
         with:
           path: ${{ steps.nu_cache_dir.outputs.path }}
-          key: udk-installer-${{ hashFiles('tool.nu') }}
-
-      - name: Install rclone
-        shell: pwsh
-        run: choco install rclone -y --no-progress
-
-      # 7-Zip is preinstalled on the runner image but not always on PATH.
-      - name: Make sure 7z is on PATH
-        shell: pwsh
-        run: |
-          if (-not (Get-Command 7z -ErrorAction SilentlyContinue)) {
-            Add-Content $env:GITHUB_PATH 'C:\Program Files\7-Zip'
-          }
+          key: udk-installer-UDKInstall-2013-02-BETA
 
       # The runner has no interactive desktop (session 0): if UDK.com's child
       # process hits an error, Windows Error Reporting pops a modal dialog
@@ -63,20 +54,14 @@ jobs:
           Set-MpPreference -DisableRealtimeMonitoring $true
           Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE
           Add-MpPreference -ExclusionPath (nu -c '$nu.cache-dir').Trim()
-          Add-MpPreference -ExclusionProcess 'nu.exe', '7z.exe', 'rclone.exe', 'UDK.com', 'UDK.exe', 'certutil.exe', 'shasum.exe', 'timeout.exe' -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionProcess 'nu.exe', '7z.exe', 'UDK.com', 'UDK.exe', 'certutil.exe', 'timeout.exe' -ErrorAction SilentlyContinue
 
-      - name: Download installer and probe UDK
-        # Probes UDK startup directly (before the full tool.nu run) with short
-        # timeouts and dumps thread wait reasons / loaded modules / TCP for any
-        # process that hangs, so we can see WHERE the engine wedges.
+      - name: Run tool.nu
+        # Hard timeout so a hung UDK.com fails the step and the log-dump runs
+        # instead of wedging until the job-level timeout.
         shell: bash
-        env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
-          cat > probe.ps1 <<'EOF'
-          $ErrorActionPreference = 'Continue'
+          cat > run-tool.ps1 <<'EOF'
           # Children inherit the process error mode: with SEM_FAILCRITICALERRORS
           # | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX a missing-DLL
           # loader dialog becomes a fast failure instead of an invisible
@@ -86,86 +71,22 @@ jobs:
           public static extern uint SetErrorMode(uint mode);
           '@
           [Win32.Kernel32]::SetErrorMode(0x8007) | Out-Null
-
-          function Dump-Udk {
-            param([string]$Label)
-            Write-Host "===== UDK DIAG ($Label) ====="
-            Get-Process -Name 'UDK' -ErrorAction SilentlyContinue | ForEach-Object {
-              Write-Host "PID=$($_.Id) exe=$($_.Path) CPU=$($_.CPU)s Threads=$($_.Threads.Count) MainWindow='$($_.MainWindowTitle)'"
-              Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" | ForEach-Object { Write-Host "cmdline: $($_.CommandLine)" }
-              Write-Host "-- TCP connections --"
-              Get-NetTCPConnection -OwningProcess $_.Id -ErrorAction SilentlyContinue | Format-Table -AutoSize | Out-String | Write-Host
-              Write-Host "-- Thread states (count x state,waitreason) --"
-              $_.Threads | Group-Object ThreadState, WaitReason | ForEach-Object { Write-Host "$($_.Count)x $($_.Name)" }
-              Write-Host "-- Loaded modules --"
-              try { ($_.Modules | ForEach-Object { $_.ModuleName }) -join ', ' | Write-Host } catch { Write-Host "modules unavailable: $_" }
-            }
-            Write-Host "-- UDKGame/Logs --"
-            if (Test-Path UDKGame/Logs) {
-              Get-ChildItem UDKGame/Logs | ForEach-Object { Write-Host "== $($_.Name) =="; Get-Content $_.FullName -Tail 60 }
-            } else {
-              Write-Host "(no Logs dir - engine hung or died before its first log write)"
-            }
-          }
-
-          function Probe {
-            param([string]$Exe, [string]$ProcArgs, [int]$TimeoutSec, [string]$Label)
-            Write-Host "===== PROBE $Label ($Exe $ProcArgs), timeout ${TimeoutSec}s ====="
-            $p = Start-Process -FilePath $Exe -ArgumentList $ProcArgs -PassThru -NoNewWindow -WorkingDirectory (Get-Location) -RedirectStandardOutput "probe-$Label.out" -RedirectStandardError "probe-$Label.err"
-            if ($null -eq $p) {
-              Write-Host "PROBE $Label FAILED TO START"
-              $script:anyHung = $true
-              return
-            }
-            if ($p.WaitForExit($TimeoutSec * 1000)) {
-              Write-Host "PROBE $Label exit=$($p.ExitCode)"
-              Get-Content "probe-$Label.out" -ErrorAction SilentlyContinue
-              Get-Content "probe-$Label.err" -ErrorAction SilentlyContinue
-            } else {
-              Write-Host "PROBE $Label HUNG after ${TimeoutSec}s"
-              $script:anyHung = $true
-              Dump-Udk $Label
-              Get-Process -Name 'UDK' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-              Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-            }
-          }
-
-          # Stage 1: download + extract only (no make), so the probes below run
-          # against a real extracted tree.
-          $env:TG_SKIP_MAKE = '1'
-          nu tool.nu
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          $script:anyHung = $false
-          $wd = (Get-Location).Path
-          # Only probe via UDK.com: raw UDK.exe is a GUI-subsystem app that
-          # finishes the commandlet but never terminates without the wrapper.
-          Probe (Join-Path $wd 'Binaries\Win64\UDK.com') 'make -unattended' 120 'com-make'
-          Remove-Item Env:TG_SKIP_MAKE -ErrorAction SilentlyContinue
-          if ($script:anyHung) {
-            Write-Host '## PROBES HUNG - skipping real build, see dumps above'
-            exit 1
-          }
-          Write-Host '===== probes passed, running full tool.nu ====='
           nu tool.nu
           exit $LASTEXITCODE
           EOF
-          timeout 1800 pwsh -NoProfile -File probe.ps1
+          timeout 1800 pwsh -NoProfile -File run-tool.ps1
 
       - name: Dump diagnostics on failure
         if: failure()
         shell: pwsh
         run: |
           Write-Host '=== UDK processes still alive ==='
-          Get-Process -Name 'UDK', 'UDK.com', 'ShaderCompileWorker', 'nu', 'pwsh' -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Host "$($_.ProcessName) PID=$($_.Id) start=$($_.StartTime) MainWindow='$($_.MainWindowTitle)'" }
+          Get-Process -Name 'UDK', 'UDK.com', 'nu' -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "$($_.ProcessName) PID=$($_.Id) start=$($_.StartTime) CPU=$($_.CPU)s MainWindow='$($_.MainWindowTitle)'" }
           Get-ChildItem UDKGame/Logs -ErrorAction SilentlyContinue | ForEach-Object {
             Write-Host "=== $($_.Name) ==="
             Get-Content $_.FullName -Tail 80
           }
-          Write-Host '=== Defender status ==='
-          Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled, AntivirusEnabled, AMServiceEnabled | Format-List
-          Get-MpPreference | Select-Object DisableRealtimeMonitoring, ExclusionPath, ExclusionProcess | Format-List
 
       - name: Upload built mod
         uses: actions/upload-artifact@v4
