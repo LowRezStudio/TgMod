@@ -37,6 +37,12 @@ jobs:
           path: ${{ steps.nu_cache_dir.outputs.path }}
           key: udk-installer-UDKInstall-2013-02-BETA
 
+      # cdn.xiloe.fr 403s GitHub runner IPs (Cloudflare), so CI downloads from
+      # R2 via rclone; tool.nu still falls back to the CDN for local runs.
+      - name: Install rclone
+        shell: pwsh
+        run: choco install rclone -y --no-progress
+
       # The runner has no interactive desktop (session 0): if UDK.com's child
       # process hits an error, Windows Error Reporting pops a modal dialog
       # nobody can click and the job hangs until timeout. Silence it.
@@ -60,6 +66,10 @@ jobs:
         # Hard timeout so a hung UDK.com fails the step and the log-dump runs
         # instead of wedging until the job-level timeout.
         shell: bash
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
           cat > run-tool.ps1 <<'EOF'
           # Children inherit the process error mode: with SEM_FAILCRITICALERRORS
