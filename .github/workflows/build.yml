@@ -113,15 +113,6 @@ jobs:
         shell: bash
         run: echo "version=$(nu -c 'open manifest.toml | get mod.version')" >> "$GITHUB_OUTPUT"
 
-      # GitHub replaces spaces with dots in release asset names, which breaks
-      # the launcher: use hyphens instead.
-      - name: Normalize asset filename
-        shell: bash
-        run: |
-          for f in output/*.tempest; do
-            mv "$f" "${f// /-}"
-          done
-
       - name: Create release
         shell: bash
         env:
