@@ -34,8 +34,10 @@ function ServerAddCheats() {
 
 // Dumb way of executing arbitrary commands on the server using one of
 // Hi-Rez's whitelisted server commands. The single transport for GM traffic:
-// exec commands on TmCheatManager funnel into here.
-reliable server function SendGM(string Command) {
+// exec commands on TmCheatManager funnel into here. The function NAME is
+// load-bearing — the game only permits calling a hardcoded set of server
+// function names, so don't rename this.
+reliable server function ServerVerifyVehiclePhys(string Command) {
     local TgPlayerController PC;
 
     if (Role == ROLE_Authority) {
