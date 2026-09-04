@@ -1,6 +1,5 @@
 let version = "UDKInstall-2013-02-BETA.exe"
 let checksum_sha256 = "b6cf432e9eb36be70b719a5de8110dbbcd78a35fb450a22f3114fe9317b4e1bc"
-let rclone_source = "r2:cdn/UDKInstall-2013-02-BETA.exe"
 let download_url = $"https://cdn.xiloe.fr/($version)"
 
 let install_path = $nu.cache-dir | path join $version
@@ -20,35 +19,9 @@ if not ($env.PWD | path join "Binaries" | path exists) {
     let cached = ($install_path | path exists) and (sha256-of $install_path) == $checksum_sha256
 
     if not $cached {
-        let r2_creds_set = not (($env.R2_ACCESS_KEY_ID? | is-empty) or ($env.R2_SECRET_ACCESS_KEY? | is-empty) or ($env.R2_ENDPOINT? | is-empty))
-
-        mut downloaded = false
-        if $r2_creds_set {
-            try {
-                let start_time = date now
-                with-env {
-                    RCLONE_CONFIG_R2_TYPE: "s3"
-                    RCLONE_CONFIG_R2_PROVIDER: "Cloudflare"
-                    RCLONE_CONFIG_R2_ACCESS_KEY_ID: $env.R2_ACCESS_KEY_ID
-                    RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: $env.R2_SECRET_ACCESS_KEY
-                    RCLONE_CONFIG_R2_ENDPOINT: $env.R2_ENDPOINT
-                } {
-                    ^rclone copy $rclone_source $nu.cache-dir --progress
-                }
-                print $"\nDownloaded \"($version)\" from \"($rclone_source)\" in ((date now) - $start_time)."
-                $downloaded = true
-            } catch {|err|
-                print $"\nDownload from \"($rclone_source)\" failed: ($err.msg)\nFalling back to \"($download_url)\"."
-            }
-        } else {
-            print $"R2 creds not set, downloading \"($version)\" from \"($download_url)\"."
-        }
-
-        if not $downloaded {
-            # curl, not `http get`: reqwest gets 403 from Cloudflare on the CDN,
-            # and this streams to disk instead of buffering 1.9GB in RAM.
-            ^curl -fL --retry 3 -o $install_path $download_url
-        }
+        # curl, not `http get`: reqwest gets 403 from Cloudflare on the CDN,
+        # and this streams to disk instead of buffering 1.9GB in RAM.
+        ^curl -fL --retry 3 -o $install_path $download_url
     }
 
     if not ($install_path | path exists) {
