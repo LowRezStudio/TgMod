@@ -1,7 +1,7 @@
 [mod]
 id = "Tempest Core"
 name = "Tempest Core"
-version = "1.0.0"
+version = "1.0.1"
 
 [[mod.authors]]
 name = "Cinnamon 🇧🇪"
