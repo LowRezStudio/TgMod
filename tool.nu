@@ -124,7 +124,7 @@ print $bundle_spec.files
 # into nu's memory (Defender live-scanning on CI makes that look like a hang).
 def sha256-of [path: string] {
     match ($nu.os-info.name) {
-        "windows" => { ^certutil -hashfile $path SHA256 | lines | where {|l| ($l | str trim) =~ '^[0-9a-fA-F]{64}$' } | first | str downcase }
+        "windows" => { ^certutil -hashfile $path SHA256 | lines | where {|l| ($l | str trim) =~ '^[0-9a-fA-F]{64}$' } | first | str lowercase }
         "macos" => { ^shasum -a 256 $path | split row " " | first }
         _ => { ^sha256sum $path | split row " " | first }
     }
