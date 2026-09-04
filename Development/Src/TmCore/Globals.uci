@@ -6,4 +6,5 @@
 
 `define UTILS class'TmCore.Utils'.static
 `define UIUTILS class'TmCore.UIUtils'.static
-`define VPC class'TmCore.TmGameViewportClient'.static
+`define CHAMPS class'TmCore.TmChampions'.static
+`define ABILITYHUD class'TmCore.TmAbilityHud'.static

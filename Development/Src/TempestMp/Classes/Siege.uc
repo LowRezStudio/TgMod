@@ -62,7 +62,7 @@ event PlayerController Login(string Portal, string Options, const UniqueNetID Un
     local PlayerController NewPC;
     local IncomingLoginData Data;
 
-    if (ParseOption(Options, "team") ~= "spec" || ParseOption(Options, "team") ~= "spectator" || ParseOption(Options, "team") ~= "3")
+    if (`UTILS.IsSpectatorTeam(ParseOption(Options, "team")))
         NextControllerClass = Class'TmCore.TmSpectatorController';
     else
         NextControllerClass = Class'TgGame.TgPlayerController';
@@ -142,9 +142,7 @@ function PlayerController SpawnPlayerController(Vector SpawnLocation, Rotator Sp
         NewPC = Spawn(NextControllerClass,,, SpawnLocation, SpawnRotation);
         if (NextPlayerGuid != "") {
             if (TgPlayerController(NewPC) != none)
-                TgPlayerController(NewPC).s_nPlayerId = `UTILS.ToInt(NextPlayerGuid);
-            else if (TmSpectatorController(NewPC) != none)
-                TmSpectatorController(NewPC).s_nPlayerId = `UTILS.ToInt(NextPlayerGuid);
+                TgPlayerController(NewPC).s_nPlayerId = int(NextPlayerGuid);
         } else {
             `LogWarn('TmSiege', "Spawned controller without playerguid");
         }
@@ -188,17 +186,17 @@ public event PostLogin(PlayerController NewPlayer) {
 
     TgPC = TgPlayerController(NewPlayer);
     if (TmSpectatorController(NewPlayer) != none) {
-        `UTILS.SetupSpecPRI(self, TgRepInfo_Player(TmSpectatorController(NewPlayer).PlayerReplicationInfo), LoginData.PlayerGuid);
+        `UTILS.SetupPRI(TgRepInfo_Player(TmSpectatorController(NewPlayer).PlayerReplicationInfo), LoginData.PlayerGuid, "", 10, 0, true);
         SetupSpectator(TmSpectatorController(NewPlayer), ProxyActor);
         return;
     }
 
     Team = `UTILS.GetTeam(LoginData.Team, GetPlayerCount());
     PRI = TgRepInfo_Player(NewPlayer.PlayerReplicationInfo);
-    `UTILS.SetupPRI(self, PRI, LoginData.PlayerGuid, LoginData.PlayerName, Team, 0);
+    `UTILS.SetupPRI(PRI, LoginData.PlayerGuid, LoginData.PlayerName, Team, 0, false);
 
     if (!AttemptReconnect(TgPC, ProxyActor, LoginData)) {
-        ChampInfo = ResolveChampion(LoginData.ChampionName);
+        ChampInfo = `CHAMPS.ResolveChampion(LoginData.ChampionName);
         BroadcastNewPrecache(ChampInfo.BotId);
         SetupPlayer(ProxyActor, TgPC, LoginData, Team, ChampInfo);
     }
@@ -248,20 +246,6 @@ event Logout(Controller Exiting) {
     }
 }
 
-function ChampionInfo ResolveChampion(string ChampionName) {
-    local ChampionInfo C;
-
-    if (ChampionName != "")
-        C = `UTILS.GetChampionByName(ChampionName);
-
-    if (C.BotId <= 0) {
-        if (ChampionName != "")
-            `LogWarn('TmSiege', "Unknown champion '" @ ChampionName @ "' — defaulting to Cassie");
-        C = `UTILS.GetChampionByName("Cassie");
-    }
-    return C;
-}
-
 function SetChampionAssignment(int PlayerId, string ChampionName) {
     local int i;
 
@@ -290,29 +274,29 @@ function ChampionInfo GetAssignedChampion(int PlayerId) {
     if (PlayerId > 0) {
         for (i = 0; i < ChampionAssignments.Length; i++) {
             if (ChampionAssignments[i].PlayerId == PlayerId)
-                return ResolveChampion(ChampionAssignments[i].ChampionName);
+                return `CHAMPS.ResolveChampion(ChampionAssignments[i].ChampionName);
         }
     }
     // Zero-struct: caller falls back to stock spawn.
-    return `UTILS.EmptyChampion();
+    return `CHAMPS.EmptyChampion();
 }
 
 function SetupPlayer(TmProxyActor ProxyActor, TgPlayerController PC, IncomingLoginData LoginData, int Team, ChampionInfo Champ) {
     local TgRepInfo_Player PRI;
     local TgPawn_Character Pawn;
 
-    SetChampionAssignment(`UTILS.ToInt(LoginData.PlayerGuid), Champ.Name);
+    SetChampionAssignment(int(LoginData.PlayerGuid), Champ.Name);
 
-    `UTILS.SetupCM(PC);
+    `UTILS.InstallCheatManager(PC, Class'TgGame.TgBattleCheatManager');
     PRI = TgRepInfo_Player(PC.PlayerReplicationInfo);
-    `UTILS.ApplyChampionToPRI(PRI, Champ);
+    `CHAMPS.ApplyChampionToPRI(PRI, Champ);
 
     RestartPlayer(PC);
 
     PC.r_bAutoPurchase = false;
     Pawn = TgPawn_Character(PC.Pawn);
     if (Pawn != none) {
-        `UTILS.ApplyLoadoutToPawn(PC, Pawn, `UTILS.GetLoadoutByBotId(Champ.BotId));
+        `CHAMPS.ApplyLoadoutToPawn(PC, Pawn, `CHAMPS.GetLoadoutByBotId(Champ.BotId));
         // Remove mid air inaccuracy
         Pawn.m_bAirAccuracyPenalty = false;
     }
@@ -326,7 +310,7 @@ function bool AttemptReconnect(TgPlayerController PC, TmProxyActor ProxyActor, I
     local TgRepInfo_Player PRI;
     local int PlayerId, Team;
 
-    PlayerId = `UTILS.ToInt(LoginData.PlayerGuid);
+    PlayerId = int(LoginData.PlayerGuid);
     if (PlayerId <= 0)
         return false;
 
@@ -349,10 +333,10 @@ function bool AttemptReconnect(TgPlayerController PC, TmProxyActor ProxyActor, I
             Team = 1;
 
         PRI = TgRepInfo_Player(PC.PlayerReplicationInfo);
-        `UTILS.SetupPRI(self, PRI, LoginData.PlayerGuid, LoginData.PlayerName, Team, 0);
-        `UTILS.ApplyChampionToPRI(PRI, `UTILS.GetChampionByBotId(P.r_nProfileId));
-        SetChampionAssignment(PlayerId, `UTILS.GetChampionByPawnClass(P.r_nProfileId).Name);
-        `UTILS.SetupCM(PC);
+        `UTILS.SetupPRI(PRI, LoginData.PlayerGuid, LoginData.PlayerName, Team, 0, false);
+        `CHAMPS.ApplyChampionToPRI(PRI, `CHAMPS.GetChampionByBotId(P.r_nProfileId));
+        SetChampionAssignment(PlayerId, `CHAMPS.GetChampionByPawnClass(P.r_nProfileId).Name);
+        `UTILS.InstallCheatManager(PC, Class'TgGame.TgBattleCheatManager');
 
         AI.CopyPropertiesTo(PC);
 
@@ -532,7 +516,7 @@ function PushPrecache(int Idx, int BotId) {
 
     Cache.CachedBotIds.AddItem(BotId);
 
-    C = `UTILS.GetChampionByBotId(BotId);
+    C = `CHAMPS.GetChampionByBotId(BotId);
     if (C.BotId > 0) {
         Cache.Proxy.ClientPrecacheClass(C.Name);
         Cache.Proxy.ClientTestPrecache(C.BotId, C.SkinId, C.WeaponSkinId, C.HeadId);

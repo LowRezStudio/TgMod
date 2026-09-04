@@ -1,6 +1,9 @@
 class TmProxyActor extends Actor;
 
-var TmCheatManager OwnedCheatManager;   // CheatManager this proxy created/bound on its client
+// GM command channel. Client-owned actor; the server executes whitelisted
+// Hi-Rez server commands through the owning controller's ConsoleCommand.
+
+// CLIENT-SIDE INSTALL
 
 simulated reliable client function ClientAddCheats() {
     local TgPlayerController PC;
@@ -11,17 +14,11 @@ simulated reliable client function ClientAddCheats() {
         return;
     }
 
-    CM = TmCheatManager(PC.CheatManager);
-    if (CM == none) {
-        PC.CheatClass = Class'TmCheatManager';
-        CM = new (PC) Class'TmCheatManager';
-        PC.CheatManager = CM;
-    }
-
+    CM = TmCheatManager(`UTILS.InstallCheatManager(PC, Class'TmCheatManager', true));
     if (CM != none) {
-        CM.InitCheatManager();
+        // Self-registration: the cheat manager learns its proxy here, so it
+        // never has to scan for one.
         CM.Proxy = self;
-        OwnedCheatManager = CM;
         `LogInfo('TmProxyActor', (("CheatManager successfully created and initialized : " @ string(CM.Name)) @ ":") @ string(CM.Outer.Name));
     } else {
         `LogError('TmProxyActor', "Failed to create CheatManager!");
@@ -35,8 +32,10 @@ function ServerAddCheats() {
 
 // CLIENT -> SERVER
 
-// Dumb way of executing arbitrary commands on the server using one Hi-Rez's whitelisted Server commands
-reliable server function ServerVerifyVehiclePhys(string Command) {
+// Dumb way of executing arbitrary commands on the server using one of
+// Hi-Rez's whitelisted server commands. The single transport for GM traffic:
+// exec commands on TmCheatManager funnel into here.
+reliable server function SendGM(string Command) {
     local TgPlayerController PC;
 
     if (Role == ROLE_Authority) {
@@ -47,7 +46,7 @@ reliable server function ServerVerifyVehiclePhys(string Command) {
     }
 }
 
-// Same thing
+// Same channel, kept for the `admin` exec surface.
 reliable server function ServerToggleVehicleJets(string command, optional string option) {
     local TgPlayerController PC;
 

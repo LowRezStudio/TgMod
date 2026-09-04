@@ -35,13 +35,7 @@ function PostRender(Canvas Canvas)
     findPCAndAttachCM();
 
     if (TmSpectatorController(PC) != none)
-    {
-        TmSpectatorController(PC).UpdateFirstPersonNudge();
-        TmSpectatorController(PC).TickSpectatorPlayerHUD();
-        TmSpectatorController(PC).TickSpectatorTeamHUD();
-        TmSpectatorController(PC).TickBurnsHud();
-        TmSpectatorController(PC).TickAbilitiesHud();
-    }
+        TmSpectatorController(PC).TickSpectatorHUD();
 }
 
 event bool Init(out string OutError)
@@ -67,20 +61,20 @@ exec function SetConsoleTarget(int PlayerIndex)
     }
 }
 
+// Client-side cheat-manager bootstrap: spawn the proxy and install
+// TmCheatManager through the single install seam in Utils.
 public function findPCAndAttachCM()
 {
     PC = TgPlayerController(self.GetPlayerOwner(0).Actor);
     if (PC.CheatManager == none)
     {
         PA = `UTILS.SetupProxy(PC);
-        PC.CheatClass = class'TmCheatManager';
-        PC.CheatManager = new(PC) class'TmCheatManager';
-        if (PC.CheatManager != none)
+        if (`UTILS.InstallCheatManager(PC, class'TmCheatManager') != none)
         {
-            PC.CheatManager.InitCheatManager();
+            // Bind the proxy now; the server-side ClientAddCheats may not
+            // arrive for a while (or at all), and GM execs need the link.
+            TmCheatManager(PC.CheatManager).Proxy = PA;
             PC.ConsoleCommand("changetaskforce 1");
         }
-        else
-            `LogError('TmGameViewport', "Failed to create CheatManager!");
     }
 }

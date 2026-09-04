@@ -1,28 +1,13 @@
 class TmCheatManager extends TgBattleCheatManager within TgPlayerController
     config(Game);
 
+// The proxy registers itself here when it installs this cheat manager
+// (TmProxyActor.ClientAddCheats); no scanning needed.
 var TmProxyActor Proxy;
 
-function TmProxyActor GetProxy() {
-    local TmProxyActor PA;
-
-    if (Proxy != none) {
-        return Proxy;
-    }
-
-    foreach Outer.AllActors(class'TmCore.TmProxyActor', PA) {
-        if (PA.Owner == Outer) {
-            Proxy = PA;
-            return PA;
-        }
-    }
-    return none;
-}
-
 exec function tempest(string command) {
-    if (GetProxy() != none) {
-        GetProxy().ServerVerifyVehiclePhys(command);
-    }
+    if (Proxy != none)
+        Proxy.SendGM(command);
 }
 
 exec function tmc(string command) {
@@ -30,21 +15,18 @@ exec function tmc(string command) {
 }
 
 exec function admin(string command, optional string option) {
-    if (GetProxy() != none) {
-        GetProxy().ServerToggleVehicleJets(command, option);
-    }
+    if (Proxy != none)
+        Proxy.ServerToggleVehicleJets(command, option);
 }
 
 exec function TEDBN(string sDeviceName, int nEquipPointId, optional int FireMode = 1)
 {
-    if (GetProxy() != none) {
-        GetProxy().ServerVerifyVehiclePhys("tedbn"@sDeviceName@nEquipPointId@FireMode);
-    }
+    if (Proxy != none)
+        Proxy.SendGM("tedbn"@sDeviceName@nEquipPointId@FireMode);
 }
 
 exec function EDBN(string sDeviceName, int nEquipPointId, optional int FireMode = 1)
 {
-    if (GetProxy() != none) {
-        GetProxy().ServerVerifyVehiclePhys("edbn"@sDeviceName@nEquipPointId@FireMode);
-    }
+    if (Proxy != none)
+        Proxy.SendGM("edbn"@sDeviceName@nEquipPointId@FireMode);
 }

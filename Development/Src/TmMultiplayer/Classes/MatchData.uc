@@ -1,1 +1,0 @@
-class MatchData extends Object;
