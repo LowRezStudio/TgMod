@@ -1,622 +1,535 @@
 class Siege extends TgGame_Paladins_Siege;
 
-var TgGame m_TgG;
-var TgRepInfo_Game GRI;
+var transient TgRepInfo_Game GRI;
 
-var int m_nPlayerCount;
-var array<TgPlayerController> m_Players;
-var array<TgPawn> pendingMountPawns;
-
-var array<TempestProxyActor> m_ProxyActors;
-
-var ATempestLib TempestLib;
-
-var Maps allMaps;
-var string nextMap;
-var bool isTravelling;
-
-var AServerConfigData ServerConfig;
-
-struct PendingLoginData
-{
-    var string netAddress;
-    var int uniqueAddressId;
-    var string playerName;
-    var string championName;
-    var string team;
-    var string password;
-    var string horse;
+// Raw login payload as sent by the launcher via connect URL options.
+struct transient IncomingLoginData {
+    var string PlayerGuid;
+    var string PlayerName;
+    var string ChampionName;
+    var string Team;
 };
 
-var array<PendingLoginData> pendingLogins;
-
-struct ServerParameters {
-    var int maxPlayers;
-    var string password;
-    var string mapName;
-    var array<string> allowedChampions;
-    var bool allowSpectators;
-    var bool totalMayhem;
+// Login data bound to the exact PlayerController it was parsed for.
+struct transient PendingLogin {
+    var PlayerController PC;
+    var IncomingLoginData Data;
 };
 
-var ServerParameters sOptions;
+// Champion choice persists across respawns.
+struct transient ChampionAssignment {
+    var int PlayerId;
+    var string ChampionName;
+};
 
-var TgRepInfo_Player shouldAnimateYourNamePRI;
-var PendingLoginData shouldAnimateYourNameData;
+// Per-client precache record; CachedBotIds dedups the RPCs.
+struct transient ProxyPrecacheState {
+    var TmProxyActor Proxy;
+    var PlayerController OwnerPC;
+    var array<int> CachedBotIds;
+};
 
-public event InitGame(String Options, out String ErrorMessage)
-{
-    super.InitGame(Options, ErrorMessage);
+// Non-champion TestPrecache entries with fixed skin ids (horse mount, Ying illusion).
+struct transient ExtraPrecacheInfo {
+    var int BotId;
+    var int SkinId;
+    var int HeadId;
+    var int WeaponSkinId;
+};
 
-    TempestLib = self.Spawn(Class'ATempestLib', self);
-    TempestLib.SetOwner(self);
-    TempestLib.initTimer();
+var transient array<PendingLogin> PendingLogins;
+var transient array<ChampionAssignment> ChampionAssignments;
+var transient array<ProxyPrecacheState> PrecacheStates;
+var transient array<ExtraPrecacheInfo> ExtraPrecaches;
+var transient array<int> ChampionsToPrecache;
 
-    sOptions.maxPlayers = TempestLib.toInt(ParseOption(Options, "maxplayers"));
-    sOptions.password = ParseOption(Options, "serverpassword");
-    sOptions.allowSpectators = HasOption(Options, "allowSpectators");
-    sOptions.totalMayhem = HasOption(Options, "totalMayhem");
-    if(sOptions.maxPlayers == 0)
-        sOptions.maxPlayers = 10;
+// Consumed within a single Login() call, never across events.
+var transient class<PlayerController> NextControllerClass;
+var transient string NextPlayerGuid;
 
-    ParseStringIntoArray(ParseOption(Options, "allowedChampions"), sOptions.allowedChampions, ",", true);
+event PreLogin(string Options, string Address, const UniqueNetId UniqueId, bool bSupportsAuth, out string ErrorMessage) {
+    super.PreLogin(Options, Address, UniqueId, bSupportsAuth, ErrorMessage);
+    if (ErrorMessage != "")
+        return;
+
+    if (ParseOption(Options, "playerguid") == "")
+        `LogWarn('TmSiege', "Login from "$Address$" has no playerguid — identity tracking will be degraded");
 }
 
-event PreLogin(string Options, string Address, const UniqueNetId UniqueId, bool bSupportsAuth, out string ErrorMessage)
-{
-    local PendingLoginData Data;
-    local int i, uniqueAddressId;
-    
-    super.PreLogin(Options, Address, UniqueId, bSupportsAuth, ErrorMessage);
-    
-    Address = Repl(Address, ".", "");
+// Parsed here because only Login() pairs a connection's options with its
+// controller spawn. Signature must match runtime Engine.u GameInfo exactly
+event PlayerController Login(string Portal, string Options, const UniqueNetID UniqueID, out string ErrorMessage, const optional UniqueNetId ConsoleUniqueId) {
+    local PlayerController NewPC;
+    local IncomingLoginData Data;
 
-    uniqueAddressId = (((TempestLib.toInt(Address) % 1000000) + ((int(WorldInfo.TimeSeconds * 10000) % 10000000) * 1000)) / (Len(Address) * 10)) + Rand(10000);
-    uniqueAddressId = int(Abs(uniqueAddressId));
-    `log(uniqueAddressId);
+    if (`UTILS.IsSpectatorTeam(ParseOption(Options, "team")))
+        NextControllerClass = Class'TmCore.TmSpectatorController';
+    else
+        NextControllerClass = Class'TgGame.TgPlayerController';
+    NextPlayerGuid = ParseOption(Options, "playerguid");
 
-    for (i = 0; i < pendingLogins.Length; i++) {
-        if (pendingLogins[i].NetAddress == Address) {
-            pendingLogins.Remove(i, 1);
-        }
+    NewPC = super.Login(Portal, Options, UniqueID, ErrorMessage, ConsoleUniqueId);
+
+    // Never leak into another connection's spawn.
+    NextControllerClass = none;
+    NextPlayerGuid = "";
+
+    if (NewPC != none && ErrorMessage == "") {
+        Data = BuildLoginData(Options);
+        RegisterPendingLogin(NewPC, Data);
+        `LogInfo('TmSiege', "Login queued: "$Data.PlayerName@"guid="$Data.PlayerGuid@"champ="$Data.ChampionName@"team="$Data.Team);
     }
 
-    Data.NetAddress = Address;
-    Data.uniqueAddressId = uniqueAddressId;
-    Data.PlayerName = TempestLib.decodeURLParam(ParseOption(Options, "name"));
+    return NewPC;
+}
+
+function IncomingLoginData BuildLoginData(string Options) {
+    local IncomingLoginData Data;
+
+    Data.PlayerGuid = ParseOption(Options, "playerguid");
+    Data.PlayerName = `UTILS.decodeURLParam(ParseOption(Options, "name"));
     Data.ChampionName = ParseOption(Options, "class");
     Data.Team = ParseOption(Options, "team");
-    Data.password = ParseOption(Options, "password");
-    Data.horse = ParseOption(Options, "horse");
-    
-    pendingLogins.AddItem(Data);
+    return Data;
 }
 
-public event PostLogin(PlayerController NewPlayer)
-{
-    local TgPlayerController TgPC;
-    local TempestSpectatorController TgSpec;
-    local TgPawn_Character TgP;
-    local TempestProxyActor ProxyActor;
-    local TempestProxyActor ProxyActorS;
-    local TgRepInfo_Player TgRPI;
-    local TgInventoryManager InvMgr;
-    local PendingLoginData Data;
-    local ChampionData SelectedChampion;
-    local TgDevice_Mount MountDevice;
-    local string Address;
+function RegisterPendingLogin(PlayerController NewPC, IncomingLoginData Data) {
     local int i;
-    super.PostLogin(NewPlayer);
-    
-    Address = Repl(NewPlayer.GetPlayerNetworkAddress(), ".", "");
-    
-    for (i = 0; i < pendingLogins.Length; i++) {
-        if (pendingLogins[i].NetAddress == Address) {
-            Data = pendingLogins[i];
-        }
+
+    PrunePendingLogins();
+
+    // Retire stale entries so a reconnect replaces rather than coexists.
+    for (i = PendingLogins.Length - 1; i >= 0; i--) {
+        if (PendingLogins[i].PC == NewPC || (Data.PlayerGuid != "" && PendingLogins[i].Data.PlayerGuid == Data.PlayerGuid))
+            PendingLogins.Remove(i, 1);
     }
-
-    TgPC = TgPlayerController(NewPlayer);
-    TgRPI = TgRepInfo_Player(NewPlayer.PlayerReplicationInfo);
-
-    ProxyActor = Class'TempestUtils'.static.SetupProxy(TgPC);
-    ProxyActor.ServerAddCheats();
-    
-    TgPC.CheatClass = Class'TgGame.TgBattleCheatManager';
-    // End:0x34A
-    if(TgPC.CheatManager == none)
-    {
-        TgPC.CheatManager = new (TgPC) Class'TgGame.TgBattleCheatManager';
-        // End:0x314
-        if(TgPC.CheatManager != none)
-        {
-            TgPC.CheatManager.InitCheatManager();
-            LogInternal((("TempestProxyActor: CheatManager successfully created and initialized : " @ string(TgPC.CheatManager.Name)) @ ":") @ string(TgPC.CheatManager.Outer.Name));            
-        }
-        else
-        {
-            LogInternal("TempestProxyActor: Failed to create CheatManager!");
-        }
-    }
-
-    m_nPlayerCount++;
-    
-    if (hasLoginBeenRejected(NewPlayer, Data))
-        return;
-    
-    m_ProxyActors.AddItem(ProxyActor);
-    
-    for (i = 0; i < sOptions.allowedChampions.Length; i++) {
-        ProxyActor.ClientPrecacheClass(sOptions.allowedChampions[i]);
-    }
-
-    // the horse
-    ProxyActor.ClientTestPrecache(2236, 12612, 0, 0, true);
-    ProxyActor.ClientTestPrecache(2236, 12616, 0, 0, true);
-    ProxyActor.ClientTestPrecache(2236, 16526, 0, 0, true);
-
-    ProxyActor.ClientTestPrecache(2267, 18656, 18655, 18657, true);
-
-    SelectedChampion = setChampion(Data);
-    SelectedChampion.mountId = getHorse(Data);
-    SelectedChampion.sprayId = getSpray(Data);
-
-    SelectedChampion = setBelgianYing(Data, SelectedChampion);
-
-    checkShouldAnimateYourName(Data, TgRPI);
-
-    Class'TempestUtils'.static.SetupPRI(m_TgG, TgRPI, Data.uniqueAddressId, Data.playerName, getTeam(Data), SelectedChampion.mountId, getTitle(Data));
-    
-    Class'TempestUtils'.static.SpawnPawn(self, TgPC, SelectedChampion.BotId, SelectedChampion.SkinId, SelectedChampion.DeviceSkinId, SelectedChampion.HeadId, SelectedChampion.mountId);
-    
-    //NewPlayer.Player.SwitchController(TgPC);
-    TgP = TgPawn_Character(TgPC.Pawn);
-
-    if (Role == Role_Authority) {
-        TgP.m_bAirAccuracyPenalty = false;
-        InvMgr = TgInventoryManager(TgP.InvManager);
-
-        InvMgr.AddDevice(TgPC.GetDeviceIdByName(SelectedChampion.card1), 19, , true, );
-        InvMgr.AddDevice(TgPC.GetDeviceIdByName(SelectedChampion.card2), 20, , true, );
-        InvMgr.AddDevice(TgPC.GetDeviceIdByName(SelectedChampion.card3), 21, , true, );
-        InvMgr.AddDevice(TgPC.GetDeviceIdByName(SelectedChampion.card4), 22, , true, );
-        InvMgr.AddDevice(TgPC.GetDeviceIdByName(SelectedChampion.card5), 5, , true, );
-        InvMgr.AddDevice(TgPC.GetDeviceIdByName(SelectedChampion.Talent), 25, , true, );
-        
-        InvMgr.AddDevice(SelectedChampion.sprayId, 17, , true, );
-    }
-
-    TgP.PostPawnSetupServer();
-    if(sOptions.TotalMayhem) {
-        TgRPI.UpdateHealth(TgP.Health, TgP.GetMaxHealth() * 2);
-    }
-
-    MountDevice = TgDevice_Mount(TgP.GetDeviceByEqPoint(23));
-    // End:0x190
-    if(MountDevice != none)
-    {
-        MountDevice.SetAllowMountServerTimer();
-        MountDevice.ClientStartMount();
-    }
-            
-    ProxyActor.ClientConsoleCommand("setreadytoplay");    
+    AddPendingLoginEntry(NewPC, Data);
 }
 
-public function Logout(Controller Exiting) {
+function AddPendingLoginEntry(PlayerController NewPC, IncomingLoginData Data) {
+    local PendingLogin Entry;
+    Entry.PC = NewPC;
+    Entry.Data = Data;
+    PendingLogins.AddItem(Entry);
+}
+
+function PrunePendingLogins() {
     local int i;
-    super.Logout(Exiting);
 
-    m_nPlayerCount--;
-    if(!isTravelling) {
-        for (i = 0; i < m_ProxyActors.Length; i++) {
-            if (m_ProxyActors[i].Owner == Exiting) {
-                m_ProxyActors.Remove(i, 1);
-            }
-        }
-        setTimer(0.25, false, 'removeBots');
+    for (i = PendingLogins.Length - 1; i >= 0; i--) {
+        if (PendingLogins[i].PC == none)
+            PendingLogins.Remove(i, 1);
     }
 }
 
-public event PreBeginPlay() {
-    super.PreBeginPlay();
-    m_TgG = TgGame(WorldInfo.Game);
-
-    allMaps = new class'Maps';
-    allMaps.loadMaps();
-
-    m_nPlayerCount = 0;
-}
-
-private function debugKillcam() {
-    local TgPlayerController TgPC;
-    local TgPawn Pawn;
-    GRI.r_bAttackersKillCamEnabled = true;
-    GRI.r_bDefendersKillCamEnabled = true;
-    `log(string(WorldInfo.IsRecordingTimelapse()) @ string(WorldInfo.IsPlayingTimelapse()));
-    `log(GameplayEventsWriter);
-    foreach AllActors(class'TgPlayerController', TgPC) {
-        if(TgPC.Pawn != none) {
-            Pawn = TgPawn(TgPC.Pawn);
-            `log("CHECK FOR" @ Pawn.Name);
-            TgPC.bForcedTimelapseRequested = true;
-            `log(string(TgPC.CanPlayKillCam(false)));
-            if((TgPC.r_fServerTimeStamp - Pawn.r_fReconnectTime) < 30.0) {
-                `log("TIMESTAMP < 30 IS CAUSING THE FALSE");
-            }
-            if(GRI == none) {
-                `log("GRI NONE IS CAUSING THE FALSE");
-            }
-            if(!GRI.r_bKillCamEnabled) {
-                `log("KILLCAMENABLED IS CAUSING THE FALSE");
-            }
-            if(GRI.r_bBlockKillCam) {
-                `log("BLOCKKILLCAM IS CAUSING THE FALSE");
-            }
-            if(GRI.r_AttackingTaskForce == none) {
-                `log("GRI ATTACKING TASKFORCE NONE IS CAUSING THE FALSE");
-            }
-            if(!GRI.r_bAttackersKillCamEnabled) {
-                `log("GRI ATTACKERS KILLCAM IS CAUSING THE FALSE");
-            }
-            if(!GRI.r_bDefendersKillCamEnabled) {
-                `log("GRI DEFENDERS KILLCAM IS CAUSING THE FALSE");
-            }
-            if(!(TgPC.m_nKillCamTargetId >= 0)) {
-                `log("KILLCAM TARGET ID IS CAUSING THE FALSE");
-            }
-            if(GRI.r_AttackingTaskForce.GetTeamNum() != TgPC.GetTaskForceNumber()) {
-                `log("GET TEAM NUM NONE IS CAUSING THE FALSE");
-            }
-            `log("");
-            `log("");
-            `log("");
-        } 
-    }
-}
-
-public function ScoreKill(Controller Killer, Controller Other)
-{
-    local TgPlayerController TgPCKiller;
-    local TgPlayerController TgPCKilled;
-    local TgPawn killerPawn;
-    local TgPawn killedPawn;
-    super.ScoreKill(Killer, Other);
-
-    TgPCKiller = TgPlayerController(Killer);
-    TgPCKilled = TgPlayerController(Other);
-
-    killerPawn = TgPawn(TgPCKiller.Pawn);
-    KilledPawn = TgPawn(TgPCKilled.Pawn);
-
-    `log("FIRED SCOREKILL" @ killerPawn.Name);
-    `log("KILLER PAWNID" @ killerPawn.r_nPawnId);
-    `log("KILLER OWNER" @ killerPawn.r_Owner.Name);
-    TgPCKilled.SetKillCamTarget(KillerPawn);
-    TgPCKilled.ClientSetKillCamTarget(killerPawn.r_nPawnId, killerPawn.r_nPawnId);
-    `log("TG PC KILLED" @ TgPCKilled.m_nKillCamTargetId @ TgPCKilled.m_nKillCamTargetBackupId);
-    `log("TG PC KILLER" @ TgPCKiller.m_nKillCamTargetId @ TgPCKiller.m_nKillCamTargetBackupId);
-    `log("KillCamViewTarget" @ TgPCKilled.GetBestKillCamTarget().Name);
-    //TgPCKilled.StartTimelapsePlayback(-7.5000000, -3.0000000, false);
-    //TgPCKilled.ControllerPreTimeLapse();
-    TgPCKilled.StartTimelapse();
-    //KilledPawn.PreTimeLapse(false);
-}
-
-public event PostBeginPlay() {
-    super.PostBeginPlay();
-
-    m_TgG = TgGame(WorldInfo.Game);
-    GRI = TgRepInfo_Game(WorldInfo.GRI);
-    isTravelling = false;
-
-    if(Role == Role_Authority) {
-        ServerConfig = new class'AServerConfigData';
-        ServerConfig.InitializeConfig();
-    }
-    if(sOptions.TotalMayhem) {
-        SetTimer(1, true, 'runTotalMayhem');
-        m_fBaseRespawnTime = 1;
-        m_fDefenseRespawnIncrease = 0;
-        m_fAttackRespawnIncrease = 0;
-        m_bCanPurchaseItemsAnywhere = true;
-    }
-
-}
-
-private function killcontroller() {
-    local TgPlayerController TgPC;
-    local TempestSpectatorController TgSC;
-    local TgRepInfo_Player TgRPI;
-    local Vector CamLoc;
-    local Rotator CamRot;
-
-    foreach AllActors(class'TempestSpectatorController', TgSC) {
-        TgRPI = TgRepInfo_Player(TgSC.PlayerReplicationInfo);
-        LogInternal("Found spectator: " @ TgRPI.PlayerName);
-
-        TgRPI.UpdateSpectatorUI();
-
-        // Destroy old controller — PRI already transferred via SwitchController
-        //TgPC.Destroy();
-
-        break;
-    }
-}
-
-private function removeBots() {
-    local TgAIController_BehaviorGod TgAI;
-    foreach AllActors(class'TgAIController_BehaviorGod', TgAI) {
-        if(TgAI != none) {
-            TgAI.Pawn.Suicide();
-            TgAI.Pawn.Destroy();
-            TgAI.PlayerReplicationInfo.Destroy();
-            TgAI.Destroy();
-        }
-    }
-}
-
-public function TaskforceWin(Int nTaskForce, EVictoryType VictoryType) {
-    local TgPlayerController TgPC;
-    local int rmap;
-    local array<MapData> ValidMaps;
+function bool FindPendingLogin(PlayerController PC, out IncomingLoginData OutData) {
     local int i;
-    local string Gamemode;
-    Gamemode = "Siege";
 
-    super.TaskforceWin(nTaskForce, VictoryType);
-
-    isTravelling = true;
-
-    for(i = 0; i < allMaps.MapDatabase.Length; i++) {
-        if(allMaps.MapDatabase[i].MapGamemodes.Find(Gamemode) != INDEX_NONE) {
-            ValidMaps.AddItem(allMaps.MapDatabase[i]);
-        }
-    }
-
-    if(ValidMaps.Length > 0) {
-        rmap = rand(ValidMaps.Length);
-        nextMap = ValidMaps[rmap].MapName;
-
-        foreach AllActors(class'TgPlayerController', TgPC) {
-            TgPC.ClientMessage("The server will soon restart and your game will close.", , 15);
-            TgPC.ClientMessage("The next Map will be:" @ ValidMaps[rmap].MapReadableName, , 15);
-        }
-    } else {
-        rmap = rand(allMaps.MapDatabase.Length);
-        nextMap = allMaps.MapDatabase[rmap].MapName;
-
-        foreach AllActors(class'TgPlayerController', TgPC) {
-            TgPC.ClientMessage("The server will soon restart and your game will close.", , 15);
-            TgPC.ClientMessage("The next Map will be:" @ allMaps.MapDatabase[rmap].MapReadableName, , 15);
-        }
-    }
-
-    SetTimer(6, false, 'proceedEndGame');
-}
-
-private event proceedEndGame() {
-    local TempestProxyActor ProxyActor;
-    foreach m_ProxyActors(ProxyActor) {
-        ProxyActor.ClientConsoleCommand("quit");
-    }
-    if(Role ==  ROLE_Authority) {     
-        foreach m_ProxyActors(ProxyActor) {
-            m_ProxyActors.RemoveItem(ProxyActor);
-        }
-        //switchMap();
-    }
-}
-
-private event runTotalMayhem() {
-    local TgPlayerController TgPC;
-    local TgPawn_Character Pawn;
-    foreach AllActors(class'TgPlayerController', TgPC) {
-        Pawn = TgPawn_Character(TgPC.Pawn);
-        if(TgPC != none && Pawn != none) {
-            reduceCooldownAndBoostUltCharge(Pawn);
-        }
-    }
-}
-
-private function reduceCooldownAndBoostUltCharge(TgPawn_Character Pawn) {
-    local float ultChargeMount, cdRatio, CD, NewCD, BaseCD;
-    ultChargeMount = 2.5f;
-    cdRatio = 0.2f;
-    if(Pawn.MySpawnGatesAreOpen() && Pawn.ShouldRecharge()) Pawn.SetProperty(2, Pawn.GetEnergy() + ultChargeMount);
-    
-    if(Pawn.GetDeviceByEqPoint(3).GetCooldownRemaining() > 0) {
-        BaseCD = Pawn.GetDeviceByEqPoint(3).GetCooldownTime();
-        CD = Pawn.GetDeviceByEqPoint(3).GetCooldownRemaining();
-
-        NewCD = CD - (BaseCD * cdRatio);
-        if(NewCD < 0) NewCD = 0;
-        Pawn.GetDeviceByEqPoint(3).ResetCooldown(0, NewCD);
-    }
-
-    if(Pawn.GetDeviceByEqPoint(4).GetCooldownRemaining() > 0) {
-        BaseCD = Pawn.GetDeviceByEqPoint(4).GetCooldownTime();
-        CD = Pawn.GetDeviceByEqPoint(4).GetCooldownRemaining();
-
-        NewCD = CD - (BaseCD * cdRatio);
-        if(NewCD < 0) NewCD = 0;
-        Pawn.GetDeviceByEqPoint(4).ResetCooldown(0, NewCD);
-    }
-
-    if(Pawn.GetDeviceByEqPoint(16).GetCooldownRemaining() > 0) {
-        BaseCD = Pawn.GetDeviceByEqPoint(16).GetCooldownTime();
-        CD = Pawn.GetDeviceByEqPoint(16).GetCooldownRemaining();
-
-        NewCD = CD - (BaseCD * cdRatio);
-        if(NewCD < 0) NewCD = 0;
-        Pawn.GetDeviceByEqPoint(16).ResetCooldown(0, NewCD);
-    }        
-}
-
-private function bool hasLoginBeenRejected(PlayerController NewPlayer, PendingLoginData data) {
-    if(isTravelling) {
-        m_TgG.RejectLogin(NewPlayer.Player, "ff");
-        m_nPlayerCount--;
-        `log("A player (" $ Data.playerName $ ")" @ "has been forced to disconnect due to: The server is restarting.");
-        return true;
-    }
-
-    if(sOptions.password != "") {
-        if(Data.password != sOptions.password) {
-            m_TgG.RejectLogin(NewPlayer.Player, "ff");
-            m_nPlayerCount--;
-            `log("A player (" $ Data.playerName $ ")" @ "has been forced to disconnect due to: Wrong password.");
+    for (i = 0; i < PendingLogins.Length; i++) {
+        if (PendingLogins[i].PC == PC) {
+            OutData = PendingLogins[i].Data;
+            PendingLogins.Remove(i, 1);
             return true;
         }
     }
-    /*
-    if(!sOptions.allowSpectators && (Data.team == "spec" || Data.team == "spectator")) {
-        m_TgG.RejectLogin(NewPlayer.Player, "ff");
-        m_nPlayerCount--;
-        `log("A player (" $ Data.playerName $ ")" @ "has been forced to disconnect due to: The server doesn't allow spectators.");
-        return true;
-    }
-*/
-    if(m_nPlayerCount > maxPlayers) {
-        m_TgG.RejectLogin(NewPlayer.Player, "ff");
-        m_nPlayerCount--;
-        `log("A player (" $ Data.playerName $ ")" @ "has been forced to disconnect due to: The server is full.");
-        return true;
-    }
     return false;
 }
 
-private function ChampionData setChampion(PendingLoginData Data) {
-    local int randChamp;
-    local string incomingName;
-    local ChampionData selectedChampion;
-    
-    incomingName = Locs(Data.ChampionName);
-    
-    if (isChampionAllowed(incomingName)) {
-        selectedChampion = findChampionByNameOrAlias(incomingName);
-        return selectedChampion;
-    }
-    
-    randChamp = Rand(sOptions.allowedChampions.Length);
-    selectedChampion = findChampionByNameOrAlias(Locs(sOptions.allowedChampions[randChamp]));
-    return selectedChampion;
-}
+function PlayerController SpawnPlayerController(Vector SpawnLocation, Rotator SpawnRotation) {
+    local PlayerController NewPC;
 
-private function bool isChampionAllowed(string championName) {
-    local int i, j;
-    
-    for (i = 0; i < ServerConfig.Champion.Length; i++) {
-        if (sOptions.allowedChampions.Find(Locs(ServerConfig.Champion[i].name)) != INDEX_NONE) {
-            if (Locs(ServerConfig.Champion[i].name) == championName) {
-                return true;
-            }
-            
-            for (j = 0; j < ServerConfig.Champion[i].aliases.Length; j++) {
-                if (Locs(ServerConfig.Champion[i].aliases[j]) == championName) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
-private function ChampionData findChampionByNameOrAlias(string championName) {
-    local int i, j;
-    local ChampionData emptyChampion;
-    
-    for (i = 0; i < ServerConfig.Champion.Length; i++) {
-        if (Locs(ServerConfig.Champion[i].name) == championName) {
-            return ServerConfig.Champion[i];
-        }
-        
-        for (j = 0; j < ServerConfig.Champion[i].aliases.Length; j++) {
-            if (Locs(ServerConfig.Champion[i].aliases[j]) == championName) {
-                return ServerConfig.Champion[i];
-            }
-        }
-    }
-    
-    return emptyChampion;
-}
-
-private function switchMap() {
-    ProcessServerTravel(nextMap, true);
-    //removeBots();  
-}
-
-public function int getTeam(PendingLoginData Data) {
-    switch(Data.Team)
-    {
-        case "1": return 1; break;
-        case "2": return 2; break;
-        case "spec": return 3; break;
-        case "spectator": return 3; break;
-    }
-    
-    return (m_nPlayerCount % 2 == 0) ? 1 : 2;
-}
-
-public function int getHorse(PendingLoginData Data) {
-    // Special Belgian Treatement
-    if(Data.netAddress == "2625572168") return 16526;
-    
-    switch(Data.horse)
-    {
-        case "1": return 12616; break;
-        case "2": return 12612; break;
-    }
-
-    return 12616;
-}
-
-public function int getSpray(PendingLoginData Data) {
-    // Special Belgian Treatement
-    if(Data.netAddress == "2625572168") return 16457; 
-
-    return 15587;
-}
-
-public function int getTitle(PendingLoginData Data) {
-    // Special Belgian Treatement
-    if(Data.netAddress == "2625572168") return 16936; 
-
-    return 0;
-}
-
-public function ChampionData setBelgianYing(PendingLoginData Data, ChampionData SelectedChampion) {
-    // Special Belgian Treatement
-    if(Data.netAddress == "262038383" && (Data.championName == "ying" || Data.championName == "bestwaifu")) {
-        SelectedChampion.BotId = 2267;
-        SelectedChampion.SkinId = 18656;
-        SelectedChampion.DeviceSkinId = 18655;
-        SelectedChampion.HeadId = 18657;
-    }
-    return SelectedChampion;
-}
-
-public function checkShouldAnimateYourName(PendingLoginData Data, TgRepInfo_Player PRI) {
-    // Special Belgian Treatement
-    if(Data.netAddress == "2625572168") {
-        shouldAnimateYourNamePRI = PRI;
-        shouldAnimateYourNameData = Data;
-    }
-}
-
-function animateYourName() {
-    `log(WorldInfo.TimeSeconds);
-    if(shouldAnimateYourNamePRI != none) shouldAnimateYourNamePRI.PlayerName = TempestLib.UpdateAnimatedName(shouldAnimateYourNameData.playerName);
-}
-
-public function initServerCheatManager(TgPlayerController TgPC) {
-    TgPC.CheatClass = Class'TgBattleCheatManager';
-    if(TgPC.CheatManager == none) {
-        TgPC.CheatManager = new (TgPC) Class'TgBattleCheatManager';
-        if(TgPC.CheatManager != none) {
-            TgPC.CheatManager.InitCheatManager();
-            `Log((("TempestProxyActor: CheatManager successfully created and initialized : " @ string(TgPC.CheatManager.Name)) @ ":") @ string(TgPC.CheatManager.Outer.Name));                
+    if (NextControllerClass != none) {
+        NewPC = Spawn(NextControllerClass,,, SpawnLocation, SpawnRotation);
+        if (NextPlayerGuid != "") {
+            if (TgPlayerController(NewPC) != none)
+                TgPlayerController(NewPC).s_nPlayerId = int(NextPlayerGuid);
         } else {
-            `Log("TempestProxyActor: Failed to create CheatManager!");
+            `LogWarn('TmSiege', "Spawned controller without playerguid");
+        }
+        if (TmSpectatorController(NewPC) != none) {
+            NewPC.PlayerReplicationInfo.bOnlySpectator = true;
+            NewPC.PlayerReplicationInfo.bIsSpectator = true;
+            NewPC.PlayerReplicationInfo.bOutOfLives = true;
+        }
+        return NewPC;
+    }
+    return super.SpawnPlayerController(SpawnLocation, SpawnRotation);
+}
+
+public event PostLogin(PlayerController NewPlayer) {
+    local TgPlayerController TgPC;
+    local TgRepInfo_Player PRI;
+    local TmProxyActor ProxyActor;
+    local IncomingLoginData LoginData;
+    local ChampionInfo ChampInfo;
+    local int Team;
+
+    super.PostLogin(NewPlayer);
+
+    if (!FindPendingLogin(NewPlayer, LoginData)) {
+        // Shouldn't happen; degrade instead of leaving the player unconfigured.
+        LoginData.PlayerName = "Player"$NewPlayer.PlayerReplicationInfo.PlayerID;
+        LoginData.ChampionName = "Cassie";
+        `LogWarn('TmSiege', "PostLogin without pending data for "$string(NewPlayer)$" — using defaults");
+    }
+
+    ProxyActor = `UTILS.SetupProxy(TgPlayerController(NewPlayer));
+    if (ProxyActor == none) {
+        `LogError('TmSiege', "Failed to spawn proxy actor for "$NewPlayer.PlayerReplicationInfo.PlayerName);
+        return;
+    }
+    ProxyActor.ServerAddCheats();
+    RegisterProxy(ProxyActor);
+
+    // Fresh client needs everything currently in play.
+    SendFullPrecache(ProxyActor);
+
+    TgPC = TgPlayerController(NewPlayer);
+    if (TmSpectatorController(NewPlayer) != none) {
+        `UTILS.SetupPRI(TgRepInfo_Player(TmSpectatorController(NewPlayer).PlayerReplicationInfo), LoginData.PlayerGuid, "", 10, 0, true);
+        SetupSpectator(TmSpectatorController(NewPlayer), ProxyActor);
+        return;
+    }
+
+    Team = `UTILS.GetTeam(LoginData.Team, GetPlayerCount());
+    PRI = TgRepInfo_Player(NewPlayer.PlayerReplicationInfo);
+    `UTILS.SetupPRI(PRI, LoginData.PlayerGuid, LoginData.PlayerName, Team, 0, false);
+
+    if (!AttemptReconnect(TgPC, ProxyActor, LoginData)) {
+        ChampInfo = `CHAMPS.ResolveChampion(LoginData.ChampionName);
+        BroadcastNewPrecache(ChampInfo.BotId);
+        SetupPlayer(ProxyActor, TgPC, LoginData, Team, ChampInfo);
+    }
+}
+
+public event PostBeginPlay() {
+    local ExtraPrecacheInfo E;
+
+    super.PostBeginPlay();
+    GRI = TgRepInfo_Game(WorldInfo.GRI);
+
+    if (GRI != none) {
+        GRI.r_bKillCamEnabled = true;
+        GRI.r_bAttackersKillCamEnabled = true;
+        GRI.r_bDefendersKillCamEnabled = true;
+        GRI.r_bBlockKillCam = false;
+    }
+
+    E.BotId = 2236; E.SkinId = 12612; // Horse
+    ExtraPrecaches.AddItem(E);
+    E.BotId = 2267; E.SkinId = 18656; E.HeadId = 18655; E.WeaponSkinId = 18657;  // Ying Illusion
+    ExtraPrecaches.AddItem(E);
+}
+
+event Logout(Controller Exiting) {
+    local int i, ExitingId;
+
+    super.Logout(Exiting);
+
+    ExitingId = -1;
+    if (TgPlayerController(Exiting) != none)
+        ExitingId = TgPlayerController(Exiting).s_nPlayerId;
+    else if (TmSpectatorController(Exiting) != none)
+        ExitingId = TmSpectatorController(Exiting).s_nPlayerId;
+
+    for (i = PendingLogins.Length - 1; i >= 0; i--) {
+        if (PendingLogins[i].PC == none || PendingLogins[i].PC == Exiting)
+            PendingLogins.Remove(i, 1);
+    }
+    for (i = PrecacheStates.Length - 1; i >= 0; i--) {
+        if (PrecacheStates[i].OwnerPC == none || PrecacheStates[i].OwnerPC == Exiting)
+            PrecacheStates.Remove(i, 1);
+    }
+    for (i = ChampionAssignments.Length - 1; i >= 0; i--) {
+        if (ChampionAssignments[i].PlayerId == ExitingId)
+            ChampionAssignments.Remove(i, 1);
+    }
+}
+
+function SetChampionAssignment(int PlayerId, string ChampionName) {
+    local int i;
+
+    if (PlayerId <= 0)
+        return;
+
+    for (i = 0; i < ChampionAssignments.Length; i++) {
+        if (ChampionAssignments[i].PlayerId == PlayerId) {
+            ChampionAssignments[i].ChampionName = ChampionName;
+            return;
         }
     }
+    AddChampionAssignment(PlayerId, ChampionName);
+}
+
+function AddChampionAssignment(int PlayerId, string ChampionName) {
+    local ChampionAssignment A;
+    A.PlayerId = PlayerId;
+    A.ChampionName = ChampionName;
+    ChampionAssignments.AddItem(A);
+}
+
+function ChampionInfo GetAssignedChampion(int PlayerId) {
+    local int i;
+
+    if (PlayerId > 0) {
+        for (i = 0; i < ChampionAssignments.Length; i++) {
+            if (ChampionAssignments[i].PlayerId == PlayerId)
+                return `CHAMPS.ResolveChampion(ChampionAssignments[i].ChampionName);
+        }
+    }
+    // Zero-struct: caller falls back to stock spawn.
+    return `CHAMPS.EmptyChampion();
+}
+
+function SetupPlayer(TmProxyActor ProxyActor, TgPlayerController PC, IncomingLoginData LoginData, int Team, ChampionInfo Champ) {
+    local TgRepInfo_Player PRI;
+    local TgPawn_Character Pawn;
+
+    SetChampionAssignment(int(LoginData.PlayerGuid), Champ.Name);
+
+    `UTILS.InstallCheatManager(PC, Class'TgGame.TgBattleCheatManager');
+    PRI = TgRepInfo_Player(PC.PlayerReplicationInfo);
+    `CHAMPS.ApplyChampionToPRI(PRI, Champ);
+
+    RestartPlayer(PC);
+
+    PC.r_bAutoPurchase = false;
+    Pawn = TgPawn_Character(PC.Pawn);
+    if (Pawn != none) {
+        `CHAMPS.ApplyLoadoutToPawn(PC, Pawn, `CHAMPS.GetLoadoutByBotId(Champ.BotId));
+        // Remove mid air inaccuracy
+        Pawn.m_bAirAccuracyPenalty = false;
+    }
+
+    ProxyActor.ClientConsoleCommand("setreadytoplay");
+}
+
+function bool AttemptReconnect(TgPlayerController PC, TmProxyActor ProxyActor, IncomingLoginData LoginData) {
+    local TgAIController_BehaviorGodDisconnected AI;
+    local TgPawn P;
+    local TgRepInfo_Player PRI;
+    local int PlayerId, Team;
+
+    PlayerId = int(LoginData.PlayerGuid);
+    if (PlayerId <= 0)
+        return false;
+
+    foreach WorldInfo.AllControllers(Class'TgGame.TgAIController_BehaviorGodDisconnected', AI) {
+        if (AI.PlayerID != PlayerId)
+            continue;
+
+        P = TgPawn(AI.Pawn);
+        if (P == none || !P.IsAliveAndWell()) {
+            `LogInfo('TmSiege', "Reconnect: player id "$PlayerId$" — old pawn gone, discarding "$AI);
+            AI.UnPossess();
+            AI.Destroy();
+            continue;
+        }
+
+        `LogInfo('TmSiege', "Reconnect: player id "$PlayerId$" taking back pawn "$P);
+
+        Team = P.GetTaskForceNumber();
+        if (Team <= 0 || Team >= 10)
+            Team = 1;
+
+        PRI = TgRepInfo_Player(PC.PlayerReplicationInfo);
+        `UTILS.SetupPRI(PRI, LoginData.PlayerGuid, LoginData.PlayerName, Team, 0, false);
+        `CHAMPS.ApplyChampionToPRI(PRI, `CHAMPS.GetChampionByBotId(P.r_nProfileId));
+        SetChampionAssignment(PlayerId, `CHAMPS.GetChampionByPawnClass(P.r_nProfileId).Name);
+        `UTILS.InstallCheatManager(PC, Class'TgGame.TgBattleCheatManager');
+
+        AI.CopyPropertiesTo(PC);
+
+        AI.UnPossess();
+        AI.Destroy();
+
+        PC.Possess(P, true);
+        PC.GotoState('PlayerWalking');
+        PC.AcknowledgePossession(P);
+        P.PostPawnSetupServer();
+
+        ProxyActor.ClientConsoleCommand("setreadytoplay");
+        return true;
+    }
+
+    return false;
+}
+
+function SetupSpectator(TmSpectatorController SPC, TmProxyActor ProxyActor) {
+    local TgPawn TargetPawn;
+    local TgPlayerController TargetPC;
+
+    if (SPC == none)
+        return;
+
+    SPC.ForwardToSpectatingMatch();
+
+    foreach WorldInfo.AllControllers(Class'TgGame.TgPlayerController', TargetPC) {
+        if (TargetPC == SPC)
+            continue;
+        TargetPawn = TgPawn(TargetPC.Pawn);
+        if (TargetPawn != none && TargetPawn.IsAliveAndWell())
+            break;
+    }
+    if (TargetPawn != none)
+        SPC.SpectatorSetViewTarget(TargetPawn);
+
+    ProxyActor.ClientConsoleCommand("setreadytoplay");
+    ProxyActor.ClientConsoleCommand("spectogglefirstperson");
+}
+
+function bool IsPlayerReadyToSpawn(TgPlayerController PC) {
+      return PC != none && PC.PlayerReplicationInfo != none
+          && TgRepInfo_Player(PC.PlayerReplicationInfo).r_TaskForce != none;
+}
+
+function RestartPlayer(Controller NewPlayer) {
+    local TgPlayerController PC;
+    PC = TgPlayerController(NewPlayer);
+    if (PC == none)
+        return;
+
+    if ((PC != none) && PC.Player != none && !PC.PlayerReplicationInfo.bOnlySpectator) {
+        NewPlayer.PlayerReplicationInfo.bReadyToPlay = false;
+        PC.ClientSetReadyState(false);
+        NewPlayer.GotoState('PlayerWaiting');
+        if (!IsPlayerReadyToSpawn(PC)) {
+            PlayerController(NewPlayer).ClientGotoState('Dead', 'Begin');
+            return;
+        }
+    } else if (PC != none) {
+        PC.ClientSetReadyState(false);
+        if (PC.PlayerReplicationInfo.bOnlySpectator)
+            return;
+    }
+    super(GameInfo).RestartPlayer(NewPlayer);
+    if (PC.Pawn != none)
+        TgPawn(PC.Pawn).PostPawnSetupServer();
+}
+
+function Pawn SpawnDefaultPawnFor(Controller NewPlayer, NavigationPoint StartSpot) {
+    local TgPlayerController PC;
+    local TgPawn P;
+    local Controller OldCtrl;
+    local ChampionInfo Champ;
+
+    PC = TgPlayerController(NewPlayer);
+    if (PC == none)
+        return super.SpawnDefaultPawnFor(NewPlayer, StartSpot);
+
+    Champ = GetAssignedChampion(PC.s_nPlayerId);
+    if (Champ.BotId <= 0) {
+        `LogWarn('TmSiege', "No champion assignment for player id "$PC.s_nPlayerId$" — falling back to stock spawn");
+        return super.SpawnDefaultPawnFor(NewPlayer, StartSpot);
+    }
+
+    EnsureBotPrecache(Champ.BotId, Champ.SkinId, Champ.HeadId, Champ.WeaponSkinId);
+
+    if (StartSpot == none)
+        return super.SpawnDefaultPawnFor(NewPlayer, StartSpot);
+
+    P = SpawnBotById(Champ.BotId, Champ.SkinId, Champ.HeadId, Champ.WeaponSkinId, StartSpot.Location, StartSpot.Rotation, none);
+    if (P != none) {
+        OldCtrl = P.Controller;
+        if (OldCtrl != none)
+            OldCtrl.Destroy();
+        P.r_bIsBot = false;
+        return P;
+    }
+
+    // Fallback
+    return super.SpawnDefaultPawnFor(NewPlayer, StartSpot);
+}
+
+function RegisterProxy(TmProxyActor ProxyActor) {
+    local ProxyPrecacheState Cache;
+
+    PruneProxies();
+
+    Cache.Proxy = ProxyActor;
+    Cache.OwnerPC = PlayerController(ProxyActor.Owner);
+    PrecacheStates.AddItem(Cache);
+}
+
+function PruneProxies() {
+    local int i;
+
+    for (i = PrecacheStates.Length - 1; i >= 0; i--) {
+        if (PrecacheStates[i].Proxy == none || PrecacheStates[i].OwnerPC == none)
+            PrecacheStates.Remove(i, 1);
+    }
+}
+
+function int FindProxyIndex(TmProxyActor ProxyActor) {
+    local int i;
+
+    for (i = 0; i < PrecacheStates.Length; i++) {
+        if (PrecacheStates[i].Proxy == ProxyActor)
+            return i;
+    }
+    return -1;
+}
+
+// Everything currently in play plus extras.
+function SendFullPrecache(TmProxyActor ProxyActor) {
+    local int Idx, i;
+
+    Idx = FindProxyIndex(ProxyActor);
+    if (Idx < 0)
+        return;
+
+    for (i = 0; i < ChampionsToPrecache.Length; i++)
+        PushPrecache(Idx, ChampionsToPrecache[i]);
+
+    for (i = 0; i < ExtraPrecaches.Length; i++)
+        PushPrecache(Idx, ExtraPrecaches[i].BotId);
+}
+
+// Send a new champion only to clients that don't have it yet.
+function BroadcastNewPrecache(int BotId) {
+    local int i;
+
+    if (BotId <= 0)
+        return;
+
+    if (ChampionsToPrecache.Find(BotId) == INDEX_NONE)
+        ChampionsToPrecache.AddItem(BotId);
+
+    PruneProxies();
+    for (i = 0; i < PrecacheStates.Length; i++)
+        PushPrecache(i, BotId);
+}
+
+function PushPrecache(int Idx, int BotId) {
+    local ProxyPrecacheState Cache;
+    local ChampionInfo C;
+    local int j;
+
+    if (Idx < 0 || Idx >= PrecacheStates.Length || BotId <= 0)
+        return;
+    Cache = PrecacheStates[Idx];
+
+    if (Cache.Proxy == none)
+        return;
+    if (Cache.CachedBotIds.Find(BotId) != INDEX_NONE)
+        return;   // already sent to this client
+
+    Cache.CachedBotIds.AddItem(BotId);
+
+    C = `CHAMPS.GetChampionByBotId(BotId);
+    if (C.BotId > 0) {
+        Cache.Proxy.ClientPrecacheClass(C.Name);
+        Cache.Proxy.ClientTestPrecache(C.BotId, C.SkinId, C.WeaponSkinId, C.HeadId);
+    } else {
+        // Fixed-id extra (horse, illusion clone): send its exact skin ids.
+        for (j = 0; j < ExtraPrecaches.Length; j++) {
+            if (ExtraPrecaches[j].BotId == BotId) {
+                Cache.Proxy.ClientTestPrecache(ExtraPrecaches[j].BotId, ExtraPrecaches[j].SkinId, ExtraPrecaches[j].WeaponSkinId, ExtraPrecaches[j].HeadId);
+                break;
+            }
+        }
+    }
+
+    // Structs copy by value, write back.
+    PrecacheStates[Idx] = Cache;
 }

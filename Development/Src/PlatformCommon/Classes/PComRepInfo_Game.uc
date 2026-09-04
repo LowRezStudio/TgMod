@@ -4,21 +4,14 @@ class PComRepInfo_Game extends GameReplicationInfo
     hidecategories(Navigation,Movement,Collision);
 
 var PComMusicThemePlayer m_MusicThemePlayer;
-var class<PComMusicThemePlayer> m_MusicThemePlayerClass;
+var Class<PComMusicThemePlayer> m_MusicThemePlayerClass;
 var globalconfig string m_MusicThemePlayerClassName;
 
-// Export UPComRepInfo_Game::execPlayMusicEvent(FFrame&, void* const)
-native function PlayMusicEvent(const name EventName);
+native function PlayMusicEvent(const name EventName);  // Export UPComRepInfo_Game::execPlayMusicEvent(FFrame&, void* const)
 
-simulated function PostBeginPlay()
-{
-    //return;    
-}
+simulated function PostBeginPlay() { }
 
-simulated function CreateMusicThemePlayer()
-{
-    //return;    
-}
+simulated function CreateMusicThemePlayer() { }
 
 defaultproperties
 {

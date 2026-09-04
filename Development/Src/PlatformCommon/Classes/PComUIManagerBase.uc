@@ -1,25 +1,16 @@
 class PComUIManagerBase extends Object
     abstract
-    native;
+    native
+    config(Engine);
 
-struct native ManagerImage
-{
+struct ManagerImage {
     var init string strImageName;
     var Texture2DDynamic pTexture;
-
-    structdefaultproperties
-    {
-        strImageName=""
-        pTexture=none
-    }
+    structdefaultproperties {}
 };
 
 var bool m_bDebugDraw;
-var bool m_bLocalLoad;
 var init array<init ManagerImage> m_cachedImages;
 var init string m_strJson;
 
-event DebugDraw(Canvas Canvas)
-{
-    //return;    
-}
+event DebugDraw(Canvas Canvas) { }

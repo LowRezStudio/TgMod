@@ -1,10 +1,10 @@
 class PComPositionHistoryServerComponent extends ActorComponent
-    native;
+    native
+    config(Engine);
 
 const MAX_POSITION_HISTORY_FRAMES = 30;
 
-struct native PComPositionHistoryData
-{
+struct PComPositionHistoryData {
     var Vector Location;
     var Rotator Rotation;
     var Vector Velocity;
@@ -12,17 +12,7 @@ struct native PComPositionHistoryData
     var bool bWasFalling;
     var bool bCollideActors;
     var bool bBlockActors;
-
-    structdefaultproperties
-    {
-        Location=(X=0.0000000,Y=0.0000000,Z=0.0000000)
-        Rotation=(Pitch=0,Yaw=0,Roll=0)
-        Velocity=(X=0.0000000,Y=0.0000000,Z=0.0000000)
-        Physics=PHYS_None
-        bWasFalling=false
-        bCollideActors=false
-        bBlockActors=false
-    }
+    structdefaultproperties {}
 };
 
 var int CurrentIndex;
@@ -36,17 +26,13 @@ var byte bCollideActors[30];
 var byte bBlockActors[30];
 var Actor.EPhysics Physics[30];
 
-// Export UPComPositionHistoryServerComponent::execRecordData(FFrame&, void* const)
-native final function RecordData();
+native function RecordData();  // Export UPComPositionHistoryServerComponent::execRecordData(FFrame&, void* const)
 
-// Export UPComPositionHistoryServerComponent::execGetPastData(FFrame&, void* const)
-native final function PComPositionHistoryData GetPastData(float RewindTime, optional bool bUseClientTimeStamps = false);
+native function PComPositionHistoryData GetPastData(float RewindTime, optional bool bUseClientTimeStamps=false);  // Export UPComPositionHistoryServerComponent::execGetPastData(FFrame&, void* const)
 
-// Export UPComPositionHistoryServerComponent::execIsOverlapping(FFrame&, void* const)
-native final function bool IsOverlapping(float RewindTime, Vector LocationToCheck, float RadiusToCheck, out PComPositionHistoryData PastDataUsed);
+native function bool IsOverlapping(float RewindTime, Vector LocationToCheck, float RadiusToCheck, out PComPositionHistoryData PastDataUsed);  // Export UPComPositionHistoryServerComponent::execIsOverlapping(FFrame&, void* const)
 
-// Export UPComPositionHistoryServerComponent::execIsInSphere(FFrame&, void* const)
-native final function bool IsInSphere(float RewindTime, Vector LocationToCheck, float RadiusToCheck, out PComPositionHistoryData PastDataUsed);
+native function bool IsInSphere(float RewindTime, Vector LocationToCheck, float RadiusToCheck, out PComPositionHistoryData PastDataUsed);  // Export UPComPositionHistoryServerComponent::execIsInSphere(FFrame&, void* const)
 
 defaultproperties
 {

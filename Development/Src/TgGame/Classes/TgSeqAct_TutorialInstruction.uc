@@ -1,12 +1,12 @@
 class TgSeqAct_TutorialInstruction extends SequenceAction
     native(Kismet)
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-var() int nMsgId;
+var () int nMsgId;
 
 defaultproperties
 {
     ObjName="Tutorial Instruction"
-	ObjCategory="TgGame"
 }

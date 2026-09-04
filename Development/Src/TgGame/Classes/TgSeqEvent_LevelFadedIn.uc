@@ -1,13 +1,13 @@
 class TgSeqEvent_LevelFadedIn extends SequenceEvent
     native(Kismet)
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
 defaultproperties
 {
     bPlayerOnly=false
     bClientSideOnly=true
-    //VariableLinks=none
+    VariableLinks=none
     ObjName="Level Faded In"
-	ObjCategory="TgGame"
 }

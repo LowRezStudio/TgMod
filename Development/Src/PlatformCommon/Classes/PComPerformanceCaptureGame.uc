@@ -1,18 +1,13 @@
 class PComPerformanceCaptureGame extends GameInfo
     native
     config(Game)
-    hidecategories(Navigation,Movement,Collision);
+    hidecategories(Navigation,Movement,Collision)
+    dependson(PComPerformanceCaptureBase);
 
-struct native PComPerformanceCaptureStatCollection
-{
+struct PComPerformanceCaptureStatCollection {
     var name ProfileName;
     var array<PComPerformanceCaptureStat> Stats;
-
-    structdefaultproperties
-    {
-        ProfileName="None"
-        Stats=()
-    }
+    structdefaultproperties {}
 };
 
 var transient PComPerformanceCaptureBase BasePerformanceCapture;
@@ -20,18 +15,11 @@ var PComPerformanceCaptureBase.EPComPerformanceCaptureState CurrentCaptureState;
 var transient array<PComPerformanceCaptureNode> NodesToCapture;
 var transient array<PComPerformanceCaptureStatsPerNode> StatsPerNode;
 
-event PostBeginPlay()
-{
-    //return;    
-}
+event PostBeginPlay() { }
 
-// Export UPComPerformanceCaptureGame::execCollectNodes(FFrame&, void* const)
-native final function CollectNodes();
+native function CollectNodes();  // Export UPComPerformanceCaptureGame::execCollectNodes(FFrame&, void* const)
 
-// Export UPComPerformanceCaptureGame::execDoNextAction(FFrame&, void* const)
-native final function DoNextAction();
+native function DoNextAction();  // Export UPComPerformanceCaptureGame::execDoNextAction(FFrame&, void* const)
 
 defaultproperties
-{
-    BasePerformanceCapture=none//PComPerformanceCaptureBase'Default__PComPerformanceCaptureGame.MyPerformanceBase'
-}
+{}

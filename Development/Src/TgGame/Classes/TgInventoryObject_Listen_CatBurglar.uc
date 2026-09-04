@@ -1,0 +1,3 @@
+class TgInventoryObject_Listen_CatBurglar extends TgInventoryObject_Listen_FirstShotDuringOrAfterMovementAbility
+    native(ChampBlades)
+    config(Engine);

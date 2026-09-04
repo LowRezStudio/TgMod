@@ -1,4 +1,5 @@
 class InterpTrackInstAkEvent extends InterpTrackInst
-    native;
+    native
+    config(Engine);
 
 var float LastUpdatePosition;

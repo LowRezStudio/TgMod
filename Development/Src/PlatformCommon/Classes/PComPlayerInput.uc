@@ -5,6 +5,7 @@ class PComPlayerInput extends PlayerInput within PlayerController
     hidecategories(Object,UIRoot);
 
 const m_nMinDisplayLookSensitivity = 1.0;
+
 const m_nMaxDisplayLookSensitivity = 100.0;
 
 var bool c_bDirty;
@@ -16,97 +17,49 @@ var float m_nMinLookSensitivity;
 var float m_nMaxLookSensitivity;
 var int m_RecCastMode;
 
-// Export UPComPlayerInput::execResetKeysToDefault(FFrame&, void* const)
-native function ResetKeysToDefault();
+native function ResetKeysToDefault();  // Export UPComPlayerInput::execResetKeysToDefault(FFrame&, void* const)
 
-// Export UPComPlayerInput::execGetBindExtended(FFrame&, void* const)
-native function bool GetBindExtended(string Str, out KeyBind Bind, optional bool bExactMatch = false);
+native function bool GetBindExtended(string Str, out KeyBind Bind, optional bool bExactMatch=false);  // Export UPComPlayerInput::execGetBindExtended(FFrame&, void* const)
 
-// Export UPComPlayerInput::execGetBindFromCommand(FFrame&, void* const)
-native function KeyBind GetBindFromCommand(string Cmd, bool bGamepad, optional int nAlternate = 0);
+native function KeyBind GetBindFromCommand(string Cmd, optional int nAlternate=0);  // Export UPComPlayerInput::execGetBindFromCommand(FFrame&, void* const)
 
-// Export UPComPlayerInput::execExtendedStringToKeybind(FFrame&, void* const)
-native function KeyBind ExtendedStringToKeybind(string Str, string Cmd);
+native function KeyBind ExtendedStringToKeybind(string Str, string Cmd);  // Export UPComPlayerInput::execExtendedStringToKeybind(FFrame&, void* const)
 
-// Export UPComPlayerInput::execKeybindToExtendedString(FFrame&, void* const)
-native function string KeybindToExtendedString(const out KeyBind Bind);
+native function string KeybindToExtendedString(const out KeyBind Bind);  // Export UPComPlayerInput::execKeybindToExtendedString(FFrame&, void* const)
 
-// xiloe: UDK is bitching again, I don't think we need this anyways
-// Export UPComPlayerInput::execGetBind(FFrame&, void* const)
-//native function string GetBind(const out name Key, const optional out KeyBind ModifierKeyBind);
+native function string GetBind(const out Name Key);  // Export UPComPlayerInput::execGetBind(FFrame&, void* const)
 
-// Export UPComPlayerInput::execGetKeybindWithCurrentModifiers(FFrame&, void* const)
-native function KeyBind GetKeybindWithCurrentModifiers(const out name Key);
+native function KeyBind GetKeybindWithCurrentModifiers(const out name Key);  // Export UPComPlayerInput::execGetKeybindWithCurrentModifiers(FFrame&, void* const)
 
-// Export UPComPlayerInput::execStoreMouseSettings(FFrame&, void* const)
-native function StoreMouseSettings();
+native function StoreMouseSettings();  // Export UPComPlayerInput::execStoreMouseSettings(FFrame&, void* const)
 
-// Export UPComPlayerInput::execReadMouseSettings(FFrame&, void* const)
-native function ReadMouseSettings();
+native function ReadMouseSettings();  // Export UPComPlayerInput::execReadMouseSettings(FFrame&, void* const)
 
-simulated function SetDirty()
-{
-    //return;    
-}
+simulated function SetDirty() { }
 
-exec function SetMouseInput(bool bInvert, bool bSmooth, float fSensitivity)
-{
-    //return;    
-}
+exec function SetMouseInput(bool bInvert, bool bSmooth, float fSensitivity) { }
 
-exec function SetLookSensitivity(float fSensitivity, optional float fSensitivityY = 0.0000000)
-{
-    //return;    
-}
+exec function SetLookSensitivity(float fSensitivity, optional float fSensitivityY=0.0000000) { }
 
-exec function SetAimAcceleration(float fLookAccel)
-{
-    //return;    
-}
+event float GetDisplayLookSensitivity() { }
 
-event float GetDisplayLookSensitivity()
-{
-    //return ReturnValue;    
-}
+event float GetDisplayLookSensitivityY() { }
 
-event float GetDisplayLookSensitivityY()
-{
-    //return ReturnValue;    
-}
+exec function SetBindExtended(const string ExtendedBinding, string Command) { }
 
-exec function SetBindExtended(const string ExtendedBinding, string Command)
-{   
-    //return;    
-}
+event SetCommandBind(string Command, int nAlternate, const string ExtendedBinding) { }
 
-event SetCommandBind(string Command, bool bGamepad, int nAlternate, const string ExtendedBinding)
-{
-    //return;    
-}
+exec function UnbindKey(const out name BindName) { }
 
-exec function UnbindKey(const out name BindName)
-{
-    //return;    
-}
+exec event UnbindCommandAll(string Command) { }
 
-exec event UnbindCommandAll(string Command)
-{
-    //return;    
-}
+exec function UnbindCommand(string Command, optional int nAlternate=0) { }
 
-exec function UnbindCommand(string Command, bool bGamepad, optional int nAlternate = 0)
-{
-    //return;    
-}
-
-exec function Jump()
-{
-    //return;    
-}
+exec function Jump() { }
 
 defaultproperties
 {
-    //c_bUseServerBindings=true
+    c_bUseServerBindings=true
     m_nKeybindConfigSet=1
     m_nMinLookSensitivity=0.1500000
     m_nMaxLookSensitivity=6.5000000

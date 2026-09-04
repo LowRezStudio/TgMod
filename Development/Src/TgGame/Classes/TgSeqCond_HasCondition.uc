@@ -1,29 +1,27 @@
 class TgSeqCond_HasCondition extends SequenceCondition
     native(Kismet)
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-enum ConditionType
-{
-    TGCT_POISON,
-    TGCT_DISEASE,
-    TGCT_REGENERATION,
-    TGCT_STUN,
-    TGCT_STEALTH,
-    TGCT_EMP_STUN,
-    TGCT_IGNITE,
-    TGCT_INVULNERABLE,
-    TGCT_SLOW,
-    //TGCT_MAX
+enum ConditionType {
+    TGCT_POISON,  // 0
+    TGCT_DISEASE,  // 1
+    TGCT_REGENERATION,  // 2
+    TGCT_STUN,  // 3
+    TGCT_STEALTH,  // 4
+    TGCT_EMP_STUN,  // 5
+    TGCT_IGNITE,  // 6
+    TGCT_INVULNERABLE,  // 7
+    TGCT_SLOW,  // 8
 };
 
-var() TgSeqCond_HasCondition.ConditionType ConditionList;
+var () TgSeqCond_HasCondition.ConditionType ConditionList;
 
 defaultproperties
 {
-    OutputLinks(0)=(LinkDesc="True",bHasImpulse=false,bDisabled=false,bDisabledPIE=false,LinkedOp=none,ActivateDelay=0.0000000,DrawY=0,bHidden=false,bMoving=false,bClampedMax=false,bClampedMin=false,bIsActivated=false)
-    OutputLinks(1)=(LinkDesc="False",bHasImpulse=false,bDisabled=false,bDisabledPIE=false,LinkedOp=none,ActivateDelay=0.0000000,DrawY=0,bHidden=false,bMoving=false,bClampedMax=false,bClampedMin=false,bIsActivated=false)
-    VariableLinks(0)=(ExpectedType=Class'Engine.SeqVar_Object',LinkDesc="Players",LinkVar="None",PropertyName="None",bWriteable=false,bSequenceNeverReadsOnlyWritesToThisVar=false,bModifiesLinkedObject=false,bHidden=false,MinVars=1,MaxVars=255,DrawX=0,CachedProperty=none,bAllowAnyType=false,bMoving=false,bClampedMax=false,bClampedMin=false)
+    OutputLinks[0]=(Links=none,LinkDesc="True",bHasImpulse=false,bDisabled=false,bDisabledPIE=false,LinkedOp=none,ActivateDelay=0.0000000,DrawY=0,bHidden=false,bMoving=false,bClampedMax=false,bClampedMin=false,bIsActivated=false)
+    OutputLinks[1]=(Links=none,LinkDesc="False",bHasImpulse=false,bDisabled=false,bDisabledPIE=false,LinkedOp=none,ActivateDelay=0.0000000,DrawY=0,bHidden=false,bMoving=false,bClampedMax=false,bClampedMin=false,bIsActivated=false)
+    VariableLinks[0]=(ExpectedType=Class'SeqVar_Object',LinkedVariables=none,LinkDesc="Players",LinkVar="None",PropertyName="None",bWriteable=false,bSequenceNeverReadsOnlyWritesToThisVar=false,bModifiesLinkedObject=false,bHidden=false,MinVars=1,MaxVars=255,DrawX=0,CachedProperty=none,bAllowAnyType=false,bMoving=false,bClampedMax=false,bClampedMin=false)
     ObjName="Has Condition"
-	ObjCategory="TgGame"
 }

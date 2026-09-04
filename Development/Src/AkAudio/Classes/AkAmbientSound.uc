@@ -1,17 +1,12 @@
 class AkAmbientSound extends Keypoint
     native
-    hidecategories(Navigation);
+    hidecategories(Navigation)
+    config(Engine);
 
 var bool bAutoPlay;
-var() bool StopWhenOwnerIsDestroyed;
+var () bool StopWhenOwnerIsDestroyed;
 var private transient bool bIsPlaying;
-var() AkEvent PlayEvent;
-
-// Export UAkAmbientSound::execStartPlayback(FFrame&, void* const)
-native function StartPlayback();
-
-// Export UAkAmbientSound::execStopPlayback(FFrame&, void* const)
-native function StopPlayback();
+var () AkEvent PlayEvent;
 
 defaultproperties
 {

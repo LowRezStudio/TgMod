@@ -1,45 +1,30 @@
 class PComImageDownloader extends Object
-    native;
+    native
+    config(Engine);
 
 const MAX_SIMULTANEOUS_DOWNLOADS = 8;
+
 const TIME_OUT = 30.f;
 
-enum EPComImageDownloadState
-{
-    TIDS_NotStarted,
-    TIDS_Downloading,
-    TIDS_Succeeded,
-    TIDS_Failed
+enum EPComImageDownloadState {
+    TIDS_NotStarted,  // 0
+    TIDS_Downloading,  // 1
+    TIDS_Succeeded,  // 2
+    TIDS_Failed,  // 3
 };
 
-struct native PComImageDownload
-{
+struct PComImageDownload {
     var init string URL;
     var init string FilePath;
-    var private native const Pointer HttpDownloader;
+    var private const Pointer HttpDownloader;
     var OnlineImageDownloaderWeb.EOnlineImageDownloadState State;
     var init array<init byte> Data;
     var bool bPendingRemoval;
-
-    structdefaultproperties
-    {
-        URL=""
-        FilePath=""
-        State=PIDS_NotStarted
-        Data=()
-        bPendingRemoval=false
-    }
+    structdefaultproperties {}
 };
 
 var init array<init PComImageDownload> DownloadImages;
-//var delegate<OnPComImageDownloaded> __OnPComImageDownloaded__Delegate;
 
-delegate OnPComImageDownloaded(PComImageDownload CachedEntry)
-{
-    //return;    
-}
+delegate OnPComImageDownloaded(PComImageDownload CachedEntry);
 
-function SetPComImageDownloadedDelegate(delegate<OnPComImageDownloaded> PComImageDownloadedDelegate)
-{
-    //return;    
-}
+function SetPComImageDownloadedDelegate(delegate<OnPComImageDownloaded> PComImageDownloadedDelegate) { }

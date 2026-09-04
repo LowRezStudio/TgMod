@@ -1,0 +1,7 @@
+class TgInventoryObject_Listen_AbilityProcBase extends TgInvListener
+    abstract
+    native(Inventory)
+    config(Engine);
+
+var const int m_nAbilitySlotRestriction;
+var const int m_nAbilityTypeRestriction;

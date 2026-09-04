@@ -1,10 +1,10 @@
 class TgSeqAct_MapOutroFinished extends SequenceAction
     native(Kismet)
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
 defaultproperties
 {
     ObjName="Map Outro Finished"
-	ObjCategory="TgGame"
 }

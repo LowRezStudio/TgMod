@@ -31,6 +31,20 @@ struct native AnimBlendChild
 	var	editoronly			int			DrawY;
 };
 
+struct native AnimationEndInformation
+{
+    var init array<init AnimNode> TreeBranchToLeaf;
+    var float PlayedTime;
+    var float ExcessTime;
+
+    structdefaultproperties
+    {
+        TreeBranchToLeaf=none
+        PlayedTime=0.0000000
+        ExcessTime=0.0000000
+    }
+};
+
 /** Array of children AnimNodes. These will be blended together and the results returned by GetBoneAtoms. */
 var	editfixedsize editinline export	array<AnimBlendChild>		Children;
 

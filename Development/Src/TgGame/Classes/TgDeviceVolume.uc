@@ -1,43 +1,43 @@
 class TgDeviceVolume extends Volume
     native(Volumes)
-    hidecategories(Navigation,Object,Movement,Display);
+    hidecategories(Navigation,Object,Movement,Display)
+    config(Engine);
 
-var() byte s_nTaskForce;
+var () bool bPainCausing;
+var bool BACKUP_bPainCausing;
+var bool s_bDeviceActive;
+var Info PainTimer;
+var Controller DamageInstigator;
+var (Object) editconst int m_nMapObjectId;
+var () int s_nDeviceId;
+var TgDeviceFire s_DeviceFireMode;
+var () byte s_nTaskForce;
 
-event int GetSupportedTaskforce()
-{
-    local TgRepInfo_Game GRI;
+native function bool SetupDevice();  // Export UTgDeviceVolume::execSetupDevice(FFrame&, void* const)
 
-    GRI = TgRepInfo_Game(WorldInfo.GRI);
-    // End:0x15D
-    if(GRI != none)
-    {
-        // End:0x151
-        if(true)
-        {
-            // End:0x151
-            if(GRI.r_AttackingTaskForce != none)
-            {
-                // End:0x10B
-                if(int(s_nTaskForce) == 1)
-                {
-                    return int(GRI.r_AttackingTaskForce.r_nTaskForce);                    
-                }
-                else
-                {
-                    // End:0x14F
-                    if(int(GRI.r_AttackingTaskForce.r_nTaskForce) == 1)
-                    {
-                        return 2;                        
-                    }
-                    else
-                    {
-                        return 1;
-                    }
-                }
-            }
-        }
-        return int(s_nTaskForce);
-    }
-    //return ReturnValue;    
-}
+simulated event PostBeginPlay() { }
+
+function Reset() { }
+
+simulated function OnToggle(SeqAct_Toggle inAction) { }
+
+function TimerPop(TgDeviceVolumeInfo T) { }
+
+simulated event Touch(Actor Other, PrimitiveComponent OtherComp, vector HitLocation, vector HitNormal) { }
+
+simulated event UnTouch(Actor Other) { }
+
+function CausePainTo(Actor Other) { }
+
+function bool CanCausePainTo(Actor Other) { }
+
+function OnSetDamageInstigator(SeqAct_SetDamageInstigator Action) { }
+
+function ApplyHit(Actor Target) { }
+
+simulated function OnSetTaskforce(TgSeqAct_SetTaskforce Action) { }
+
+event int GetSupportedTaskforce() { }
+
+defaultproperties
+{}

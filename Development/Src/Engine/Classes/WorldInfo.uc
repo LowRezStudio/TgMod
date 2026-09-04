@@ -73,7 +73,7 @@ var	const noimport transient		array<PortalVolume>		PortalVolumes;
 var	const noimport transient		array<EnvironmentVolume>    EnvironmentVolumes;
 
 /** Level collection. ULevels are referenced by FName (Package name) to avoid serialized references. Also contains offsets in world units */
-var(WorldInfo) editinline array<LevelStreaming> StreamingLevels; // HACK: un-const'd for paladins
+var(WorldInfo) const editconst editinline array<LevelStreaming> StreamingLevels;
 
 /**
  * This is a bool on the level which is set when a light that needs to have lighting rebuilt
@@ -992,6 +992,15 @@ cpptext
 //-----------------------------------------------------------------------------
 // Functions.
 
+// Export UWorldInfo::execIsPlayingTimelapse(FFrame&, void* const)
+native final function bool IsPlayingTimelapse();
+
+// Export UWorldInfo::execIsTimelapsePlayOfTheGame(FFrame&, void* const)
+native final function bool IsTimelapsePlayOfTheGame();
+
+// Export UWorldInfo::execIsRecordingTimelapse(FFrame&, void* const)
+native final function bool IsRecordingTimelapse();
+
 /** ==== NAV MESH PATH CONSTRAINT/GOAL EVALUATOR POOLING ==== */
 /**
  * will go through all the pools for each constraint/evaluator class that has been added so far and reset
@@ -1470,15 +1479,6 @@ simulated event NotifyHostMigrationStateChanged(EHostMigrationProgress NewState,
 		}
 	}
 }
-
-// Export UWorldInfo::execIsPlayingTimelapse(FFrame&, void* const)
-native final function bool IsPlayingTimelapse();
-
-// Export UWorldInfo::execIsTimelapsePlayOfTheGame(FFrame&, void* const)
-native final function bool IsTimelapsePlayOfTheGame();
-
-// Export UWorldInfo::execIsRecordingTimelapse(FFrame&, void* const)
-native final function bool IsRecordingTimelapse();
 
 /**
  * Enable or disable host migration.

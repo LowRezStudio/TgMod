@@ -1,0 +1,103 @@
+class TmProxyActor extends Actor;
+
+// GM command channel. Client-owned actor; the server executes whitelisted
+// Hi-Rez server commands through the owning controller's ConsoleCommand.
+
+// CLIENT-SIDE INSTALL
+
+simulated reliable client function ClientAddCheats() {
+    local TgPlayerController PC;
+    local TmCheatManager CM;
+
+    PC = TgPlayerController(Owner);
+    if (PC == none) {
+        return;
+    }
+
+    CM = TmCheatManager(`UTILS.InstallCheatManager(PC, Class'TmCheatManager', true));
+    if (CM != none) {
+        // Self-registration: the cheat manager learns its proxy here, so it
+        // never has to scan for one.
+        CM.Proxy = self;
+        `LogInfo('TmProxyActor', (("CheatManager successfully created and initialized : " @ string(CM.Name)) @ ":") @ string(CM.Outer.Name));
+    } else {
+        `LogError('TmProxyActor', "Failed to create CheatManager!");
+    }
+}
+
+function ServerAddCheats() {
+    ClientAddCheats();
+}
+
+
+// CLIENT -> SERVER
+
+// Dumb way of executing arbitrary commands on the server using one of
+// Hi-Rez's whitelisted server commands. The single transport for GM traffic:
+// exec commands on TmCheatManager funnel into here. The function NAME is
+// load-bearing — the game only permits calling a hardcoded set of server
+// function names, so don't rename this.
+reliable server function ServerVerifyVehiclePhys(string Command) {
+    local TgPlayerController PC;
+
+    if (Role == ROLE_Authority) {
+        PC = TgPlayerController(Owner);
+        if (PC != none) {
+            PC.ConsoleCommand(Command);
+        }
+    }
+}
+
+// Same channel, kept for the `admin` exec surface.
+reliable server function ServerToggleVehicleJets(string command, optional string option) {
+    local TgPlayerController PC;
+
+    PC = TgPlayerController(Owner);
+
+    if (command ~= "help") {
+        PC.ClientMessage("Admin help");
+    }
+}
+
+// SERVER -> CLIENT
+
+simulated reliable client function ClientLog(string message) {
+    `LogInfo('TmProxyActor', message);
+}
+
+simulated reliable client function ClientConsoleCommand(string Command, optional bool WriteToLog) {
+    local TmCheatManager CM;
+
+    CM = TmCheatManager(TgPlayerController(Owner).CheatManager);
+    if (CM != none) {
+        CM.Outer.ConsoleCommand(Command, WriteToLog);
+    } else {
+        `Log("TempestProxyActor: No cheat manager found");
+    }
+}
+
+simulated reliable client function ClientPrecacheClass(string GodName, optional string SkinName, optional string WeaponSkinName) {
+    ClientConsoleCommand("PrecacheClass" @ GodName @ SkinName @ WeaponSkinName);
+}
+
+simulated reliable client function ClientTestPrecache(int BotId, int SkinId, int WeaponSkinId, int HeadId) {
+    ClientConsoleCommand("TestPrecache" @ BotId @ SkinId @ WeaponSkinId @ HeadId @ "true");
+}
+
+public simulated reliable client function talkToClient(string message) {
+    `LogInfo('TmProxyActor', "The server said to me :" @ message);
+}
+
+function string GetOwnerName() {
+    local TgPlayerController PC;
+
+    PC = TgPlayerController(Owner);
+    if (PC != none && PC.PlayerReplicationInfo != none) {
+        return PC.PlayerReplicationInfo.PlayerName;
+    }
+    return string(Owner);
+}
+
+defaultproperties {
+    bOnlyRelevantToOwner=true
+}

@@ -2,97 +2,61 @@ class PComOpenBroadcaster extends Object
     native
     config(Game);
 
-enum EPComOpenBroadcasterState
-{
-    POBS_Idle,
-    POBS_WaitingForFacebookWebBrowserLoaded,
-    POBS_WaitingForFacebookNewPublishFlow,
-    POBS_FacebookNewPublishError,
-    POBS_WaitingForFacebookLogin,
-    POBS_WaitingForFacebookPublish,
-    POBS_FacebookPublishFinished,
-    POBS_Streaming,
-    POBS_Quitting
+enum EPComOpenBroadcasterState {
+    POBS_Idle,  // 0
+    POBS_WaitingForFacebookWebBrowserLoaded,  // 1
+    POBS_WaitingForFacebookNewPublishFlow,  // 2
+    POBS_FacebookNewPublishError,  // 3
+    POBS_WaitingForFacebookLogin,  // 4
+    POBS_WaitingForFacebookPublish,  // 5
+    POBS_FacebookPublishFinished,  // 6
+    POBS_Streaming,  // 7
+    POBS_Quitting,  // 8
 };
 
-struct native PComOpenBroadcasterSettings
-{
-    var() bool bAllowWebcam;
-    var() bool bAllowMicrophone;
-    var() bool bAllowDesktopAudio;
-
-    structdefaultproperties
-    {
-        bAllowWebcam=false
-        bAllowMicrophone=false
-        bAllowDesktopAudio=true
-    }
+struct PComOpenBroadcasterSettings {
+    var () bool bAllowWebcam;
+    var () bool bAllowMicrophone;
+    var () bool bAllowDesktopAudio;
+    structdefaultproperties {}
 };
 
-var private native const noexport Pointer VfTable_FCallbackEventDevice;
 var config string FacebookAppId;
 var config string FacebookApprovedDomain;
 var config string FacebookLiveUrl;
 var transient PComOpenBroadcaster.EPComOpenBroadcasterState CurrentState;
 var transient PComOpenBroadcasterSettings CurrentSettings;
 var transient Pointer StreamerProcessHandle;
-var delegate<PreloadWebBrowser> __PreloadWebBrowser__Delegate;
-var delegate<IsWebBrowserLoaded> __IsWebBrowserLoaded__Delegate;
-var delegate<OpenWebBrowser> __OpenWebBrowser__Delegate;
-var delegate<CloseWebBrowser> __CloseWebBrowser__Delegate;
 
-delegate PreloadWebBrowser()
-{
-    //return;    
-}
+delegate PreloadWebBrowser();
 
-delegate bool IsWebBrowserLoaded()
-{
-    //return ReturnValue;    
-}
+delegate bool IsWebBrowserLoaded();
 
-delegate OpenWebBrowser(string URL)
-{
-    //return;    
-}
+delegate OpenWebBrowser(string URL);
 
-delegate CloseWebBrowser()
-{
-    //return;    
-}
+delegate CloseWebBrowser();
 
-// Export UPComOpenBroadcaster::execIsStreaming(FFrame&, void* const)
-native function bool IsStreaming();
+native function bool IsStreaming();  // Export UPComOpenBroadcaster::execIsStreaming(FFrame&, void* const)
 
-// Export UPComOpenBroadcaster::execSetStreamSettings(FFrame&, void* const)
-native function SetStreamSettings(const out PComOpenBroadcasterSettings InSettings);
+native function SetStreamSettings(const out PComOpenBroadcasterSettings InSettings);  // Export UPComOpenBroadcaster::execSetStreamSettings(FFrame&, void* const)
 
-// Export UPComOpenBroadcaster::execQueueFacebookStreaming(FFrame&, void* const)
-native function QueueFacebookStreaming();
+native function QueueFacebookStreaming();  // Export UPComOpenBroadcaster::execQueueFacebookStreaming(FFrame&, void* const)
 
-// Export UPComOpenBroadcaster::execStartFacebookStreaming(FFrame&, void* const)
-native function StartFacebookStreaming();
+native function StartFacebookStreaming();  // Export UPComOpenBroadcaster::execStartFacebookStreaming(FFrame&, void* const)
 
-// Export UPComOpenBroadcaster::execStartRTMPStreaming(FFrame&, void* const)
-native function StartRTMPStreaming(string InServer, string InKey);
+native function StartRTMPStreaming(string InServer, string InKey);  // Export UPComOpenBroadcaster::execStartRTMPStreaming(FFrame&, void* const)
 
-// Export UPComOpenBroadcaster::execStopStreaming(FFrame&, void* const)
-native function StopStreaming();
+native function StopStreaming();  // Export UPComOpenBroadcaster::execStopStreaming(FFrame&, void* const)
 
-// Export UPComOpenBroadcaster::execForceStopStreaming(FFrame&, void* const)
-native function ForceStopStreaming();
+native function ForceStopStreaming();  // Export UPComOpenBroadcaster::execForceStopStreaming(FFrame&, void* const)
 
-// Export UPComOpenBroadcaster::execTick(FFrame&, void* const)
-native final function Tick();
+native function Tick();  // Export UPComOpenBroadcaster::execTick(FFrame&, void* const)
 
-simulated event WebRequest DecodeFacebookRTMPUrl(string InRequest)
-{
-    //return ReturnValue;    
-}
+simulated event WebRequest DecodeFacebookRTMPUrl(string InRequest) { }
 
 defaultproperties
 {
-    // FacebookAppId="958422817557131"
-    // FacebookApprovedDomain="www.smitegame.com"
-    // CurrentSettings=(bAllowWebcam=false,bAllowMicrophone=false,bAllowDesktopAudio=true)
+    FacebookAppId="1871049266456588"
+    FacebookApprovedDomain="www.hirezstudios.com"
+    CurrentSettings=(bAllowWebcam=false,bAllowMicrophone=false,bAllowDesktopAudio=true)
 }

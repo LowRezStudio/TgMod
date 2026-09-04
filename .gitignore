@@ -3,8 +3,14 @@
 !bundle.yaml
 !filelist.txt
 !tool.nu
+!tool/
+!tool/**
 !manifest.toml
 !README.md
+!.github/
+!.github/**
+!exported/
+!exported/**
 !Config/
 !Config/*
 !Development/

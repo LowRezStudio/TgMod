@@ -157,6 +157,22 @@ struct native VisiblePortalInfo
 		}
 	}
 };
+
+enum EStunType
+{
+    STUN_TYPE_NONE,                 // 0
+    STUN_TYPE_PREMATCH,             // 1
+    STUN_TYPE_NOPOSTURE,            // 2
+    STUN_TYPE_MOUNT,                // 3
+    STUN_TYPE_STASIS,               // 4
+    STUN_TYPE_DISORIENT,            // 5
+    STUN_TYPE_NORMAL,               // 6
+    STUN_TYPE_TAUNT,                // 7
+    STUN_TYPE_MESMERIZED,           // 8
+    STUN_TYPE_FEARED,               // 9
+    STUN_TYPE_PANICKED,             // 10
+    STUN_TYPE_MAX                   // 11
+};
 var array<VisiblePortalInfo> VisiblePortals;
 
 /** indicates that the AI is within a lane in its CurrentPath (like a road)

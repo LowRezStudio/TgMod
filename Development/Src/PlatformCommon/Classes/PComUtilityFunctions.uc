@@ -1,11 +1,9 @@
 class PComUtilityFunctions extends Object
-    native;
+    native
+    config(Engine);
 
-// Export UPComUtilityFunctions::execFakeNetSerialize(FFrame&, void* const)
-native static function Vector FakeNetSerialize(const out Vector InVector);
+native function Vector FakeNetSerialize(const out Vector InVector);  // Export UPComUtilityFunctions::execFakeNetSerialize(FFrame&, void* const)
 
-// Export UPComUtilityFunctions::execIsAWithStop(FFrame&, void* const)
-native static function bool IsAWithStop(Object InObject, const Class SomeBase, const Class StopAtBase);
+native function bool IsAWithStop(Object InObject, const Class SomeBase, const Class StopAtBase);  // Export UPComUtilityFunctions::execIsAWithStop(FFrame&, void* const)
 
-// Export UPComUtilityFunctions::execGetGDeltaTime(FFrame&, void* const)
-native static function float GetGDeltaTime();
+native function float GetGDeltaTime();  // Export UPComUtilityFunctions::execGetGDeltaTime(FFrame&, void* const)

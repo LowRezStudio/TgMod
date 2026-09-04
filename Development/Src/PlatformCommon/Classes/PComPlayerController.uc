@@ -8,563 +8,242 @@ var bool m_bPartySessionJoinInProgress;
 var bool m_bPartySessionCreateInProgress;
 var bool m_bPartyDestroyInProgress;
 var transient bool m_bQuittingToMainMenu;
-var transient bool m_bHasAcknowledgedPawn;
-var transient bool m_bLastClientTokenRequestFailed;
-var globalconfig bool m_bKeepLoggedIn;
-var dword m_dwPendingPartyId;
 var config int m_nMaxPartyPublicConnections;
 var OnlineGameSearchResult m_PendingInviteResult;
 var const name PartySessionName;
 var const name GameSessionName;
-var globalconfig dword m_dwLastLoginPortalId;
-var globalconfig dword m_dwLastLoginAccountId;
-var globalconfig string m_sLastLoginAccessToken;
-var globalconfig string m_sLastLoginAccessTokenExpiration;
-
-// Export UPComPlayerController::execClientAddCheats(FFrame&, void* const)
-native function ClientAddCheats();
-
-// xiloe: added bFore to stop UDK from bitching
-simulated function AddCheats(optional bool bForce)
-{
-    ClientAddCheats();
-    //return;    
-}
-
-exec function TestVideoPlayer()
-{
-    //return;    
-}
-
-// Export UPComPlayerController::execUpdateDatacenterPing(FFrame&, void* const)
-native function UpdateDatacenterPing();
-
-// Export UPComPlayerController::execChallengeCreate(FFrame&, void* const)
-native exec function ChallengeCreate(int nQueue, string fsName, optional string fsPassword);
-
-// Export UPComPlayerController::execChallengeJoin(FFrame&, void* const)
-native exec function ChallengeJoin(int nMatchId, string fsName, optional string fsPassword);
-
-// Export UPComPlayerController::execUpdateClientToken(FFrame&, void* const)
-native function UpdateClientToken(string Token);
-
-// Export UPComPlayerController::execUpdateClientAuthToken(FFrame&, void* const)
-native function UpdateClientAuthToken(string Token);
-
-// Export UPComPlayerController::execValidateCreatedPartySession(FFrame&, void* const)
-native function ValidateCreatedPartySession();
-
-// Export UPComPlayerController::execPlayerRetrievedOSSInventory(FFrame&, void* const)
-//native function PlayerRetrievedOSSInventory(out array<MarketplaceInventoryItem> Items);
-
-// Export UPComPlayerController::execBeginLogin(FFrame&, void* const)
-native exec function BeginLogin();
-
-// Export UPComPlayerController::execGetTokenURL(FFrame&, void* const)
-native function string GetTokenURL();
-
-event GetOSSTokenAndSignatureForLogin()
-{
-    //return;    
-}
-
-function PlayerReceivedURLTokenAndSignatureForLogin(bool bSuccess, byte LocalUserNum, string URL, string Token, string AuthToken, string Signature)
-{
-    //return;    
-}
-
-// Export UPComPlayerController::execPlayerReceivedTokenForLogin(FFrame&, void* const)
-native function PlayerReceivedTokenForLogin(bool bSuccess);
-
-event CacheLoggedInGamepad()
-{
-    //return;    
-}
-
-event bool ShowConsoleLoginUI(int ControllerId, optional bool bForceLoginAfter)
-{
-    //return ReturnValue;    
-}
-
-event bool IsLoggedIntoOSS()
-{
-    //return ReturnValue;    
-}
-
-event RefreshStoreData()
-{
-    //return;    
-}
 
-//function OnReadAvailableProductsComplete(OnlineSubsystem.EMediaItemType MediaType)
-//{
-    //return;    
-//}
+native function ClientAddCheats();  // Export UPComPlayerController::execClientAddCheats(FFrame&, void* const)
 
-//function OnReadDetailsForProductIdListComplete(out array<MarketplaceProductDetails> ProductList)
-//{
-    //return;    
-//}
+simulated function AddCheats(optional bool bForce) { }
 
-//function OnReadAdditionalProductDetailsComplete(OnlineSubsystem.EMediaItemType MediaType)
-//{
-    //return;    
-//}
+exec function TestVideoPlayer() { }
 
-exec function DumpGameProducts()
-{
-    //return;    
-}
+native exec function DumpConfig();  // Export UPComPlayerController::execDumpConfig(FFrame&, void* const)
 
-exec function DumpDurables()
-{
-    //return;    
-}
+native exec function string GetConfig(string Key);  // Export UPComPlayerController::execGetConfig(FFrame&, void* const)
 
-exec function DumpConumables()
-{
-    //return;    
-}
+native exec function int GetConfigInt(string Key);  // Export UPComPlayerController::execGetConfigInt(FFrame&, void* const)
 
-//exec function DumpStoreCatalog(OnlineSubsystem.EMediaItemType MediaType)
-//{
-    //return;    
-//}
+native exec function bool GetConfigBool(string Key);  // Export UPComPlayerController::execGetConfigBool(FFrame&, void* const)
 
-event ProcessPortalInventoryWithAuthToken()
-{
-    //return;    
-}
+native exec function SetConfig(string Key, string Value);  // Export UPComPlayerController::execSetConfig(FFrame&, void* const)
 
-function PlayerReceivedURLTokenAndSignatureForPortalInventory(bool bSuccess, byte LocalUserNum, string URL, string Token, string AuthToken, string Signature)
-{
-    //return;    
-}
+native exec function TeamInvite(string fsName);  // Export UPComPlayerController::execTeamInvite(FFrame&, void* const)
 
-function OnReadPlayerMarketplaceInventoryComplete()
-{
-    //return;    
-}
+native exec function TeamAccept(bool bAccepted);  // Export UPComPlayerController::execTeamAccept(FFrame&, void* const)
 
-event OnlineSubsystem.EOnlineEnumerationReadState GetPlayerDLCLicenses(out array<OnlineContent> ContentList)
-{
-    //return ReturnValue;    
-}
+native exec function TeamLeave();  // Export UPComPlayerController::execTeamLeave(FFrame&, void* const)
 
-simulated function OnMarketplaceItemPurchased()
-{
-    //return;    
-}
+native exec function TeamSetLeader(string fsLeader);  // Export UPComPlayerController::execTeamSetLeader(FFrame&, void* const)
 
-// Export UPComPlayerController::execOnLoginStatusChange(FFrame&, void* const)
-native function OnLoginStatusChange(OnlineSubsystem.ELoginStatus NewStatus, UniqueNetId NewId);
+native exec function ChallengeCreate(int nQueue, string fsName, optional string fsPassword);  // Export UPComPlayerController::execChallengeCreate(FFrame&, void* const)
 
-// Export UPComPlayerController::execOnConnectionStatusChange(FFrame&, void* const)
-native function OnConnectionStatusChange(OnlineSubsystem.EOnlineServerConnectionStatus ConnectionStatus);
+native exec function ChallengeJoin(int nQueue, string fsName, optional string fsPassword);  // Export UPComPlayerController::execChallengeJoin(FFrame&, void* const)
 
-// Export UPComPlayerController::execOnCurrentUserChanged(FFrame&, void* const)
-native function OnCurrentUserChanged(byte LocalUserNum, string CurrentUser, string LoggedInUser);
+native function PlayerRetrievedOSSInventory(out array<MarketplaceInventoryItem> Items);  // Export UPComPlayerController::execPlayerRetrievedOSSInventory(FFrame&, void* const)
 
-// Export UPComPlayerController::execOnRemoteTalkerStatusChange(FFrame&, void* const)
-native function OnRemoteTalkerStatusChange(UniqueNetId RemoteNetId, bool bIsTalking);
+native function SendPlayerDLCLicensesToServer();  // Export UPComPlayerController::execSendPlayerDLCLicensesToServer(FFrame&, void* const)
 
-// Export UPComPlayerController::execSendSessionStart(FFrame&, void* const)
-native function SendSessionStart(int GameModeId);
+native function PlayerReceivedURLTokenAndSignature(byte LocalUserNum, string URL, string Token, string Signature);  // Export UPComPlayerController::execPlayerReceivedURLTokenAndSignature(FFrame&, void* const)
 
-// Export UPComPlayerController::execSendSessionEnd(FFrame&, void* const)
-native function SendSessionEnd();
+event RefreshStoreData() { }
 
-// Export UPComPlayerController::execIsInCustomMatch(FFrame&, void* const)
-native simulated function bool IsInCustomMatch();
+function OnReadAvailableProductsComplete(OnlineSubsystem.EMediaItemType MediaType) { }
 
-// Export UPComPlayerController::execMCTSSetSessionId(FFrame&, void* const)
-native function MCTSSetSessionId(byte PlatformSpecificInfo[80]);
+function OnReadAdditionalProductDetailsComplete(OnlineSubsystem.EMediaItemType MediaType) { }
 
-// Export UPComPlayerController::execTryJoinSession(FFrame&, void* const)
-native function TryJoinSession();
+exec function DumpGameProducts() { }
 
-// Export UPComPlayerController::execConnectToPeers(FFrame&, void* const)
-//native simulated function ConnectToPeers(out array<SessionMemberInfo> SessionListInfo);
+exec function DumpDurables() { }
 
-// Export UPComPlayerController::execShowPrivilegeMessageAndDeclineInvite(FFrame&, void* const)
-native simulated function ShowPrivilegeMessageAndDeclineInvite();
+exec function DumpConumables() { }
 
-// Export UPComPlayerController::execFilterFriendListForPeoplePicker(FFrame&, void* const)
-//native simulated function FilterFriendListForPeoplePicker(out array<OnlineFriend> FriendList, out array<SessionMemberInfo> SessionMemberList);
+exec function DumpStoreCatalog(OnlineSubsystem.EMediaItemType MediaType) { }
 
-// Export UPComPlayerController::execBlockPartySceneInput(FFrame&, void* const)
-native function BlockPartySceneInput(bool bBlockInput);
+event GetOSSTokenAndSignature(string URL) { }
 
-// Export UPComPlayerController::execUpdateMCTSSession(FFrame&, void* const)
-native simulated function UpdateMCTSSession(string SessionGuid, bool bIsHost);
+event GetMarketplaceInventory() { }
 
-// Export UPComPlayerController::execArePartySessionInvitesAllowed(FFrame&, void* const)
-native function bool ArePartySessionInvitesAllowed();
+function OnReadPlayerMarketplaceInventoryComplete() { }
 
-// Export UPComPlayerController::execCreateOrJoinPartySession(FFrame&, void* const)
-native function CreateOrJoinPartySession();
+event OnlineSubsystem.EOnlineEnumerationReadState GetPlayerDLCLicenses(out array<OnlineContent> ContentList) { }
 
-function bool ShouldPartySessionsBePublic()
-{
-    //return ReturnValue;    
-}
+simulated function OnMarketplaceItemPurchased() { }
 
-// Export UPComPlayerController::execShowControllerDisconnectedWarning(FFrame&, void* const)
-native function ShowControllerDisconnectedWarning();
+native function OnLoginStatusChange(OnlineSubsystem.ELoginStatus NewStatus, UniqueNetId NewId);  // Export UPComPlayerController::execOnLoginStatusChange(FFrame&, void* const)
 
-// Export UPComPlayerController::execShowNoFriendsForPartyInviteWarning(FFrame&, void* const)
-native function ShowNoFriendsForPartyInviteWarning();
+native function OnConnectionStatusChange(OnlineSubsystem.EOnlineServerConnectionStatus ConnectionStatus);  // Export UPComPlayerController::execOnConnectionStatusChange(FFrame&, void* const)
 
-// Export UPComPlayerController::execShowUnableToReadFriendsListWarning(FFrame&, void* const)
-native function ShowUnableToReadFriendsListWarning();
+native function OnCurrentUserChanged(byte LocalUserNum, string CurrentUser, string LoggedInUser);  // Export UPComPlayerController::execOnCurrentUserChanged(FFrame&, void* const)
 
-// Export UPComPlayerController::execShowPartyFullWarning(FFrame&, void* const)
-native function ShowPartyFullWarning(bool bPartySession);
+native function OnRemoteTalkerStatusChange(UniqueNetId RemoteNetId, bool bIsTalking);  // Export UPComPlayerController::execOnRemoteTalkerStatusChange(FFrame&, void* const)
 
-// Export UPComPlayerController::execShowPartyNoLongerAvailableWarning(FFrame&, void* const)
-native function ShowPartyNoLongerAvailableWarning();
+native function SendSessionStart(int GameModeId);  // Export UPComPlayerController::execSendSessionStart(FFrame&, void* const)
 
-// Export UPComPlayerController::execShowPackageNotInstalledForPartyInviteWarning(FFrame&, void* const)
-native function ShowPackageNotInstalledForPartyInviteWarning();
+native function SendSessionEnd();  // Export UPComPlayerController::execSendSessionEnd(FFrame&, void* const)
 
-// Export UPComPlayerController::execShowCustomGameDisallowedPopup(FFrame&, void* const)
-native function ShowCustomGameDisallowedPopup();
+native simulated function bool IsInCustomMatch();  // Export UPComPlayerController::execIsInCustomMatch(FFrame&, void* const)
 
-// Export UPComPlayerController::execTryOpenPartyUI(FFrame&, void* const)
-native function TryOpenPartyUI();
+native function MCTSSetSessionId(byte PlatformSpecificInfo[80]);  // Export UPComPlayerController::execMCTSSetSessionId(FFrame&, void* const)
 
-// Export UPComPlayerController::execUpdatePartyUI(FFrame&, void* const)
-native function UpdatePartyUI();
+native function TryJoinSession();  // Export UPComPlayerController::execTryJoinSession(FFrame&, void* const)
 
-// Export UPComPlayerController::execLeaveMatchQueue(FFrame&, void* const)
-native function LeaveMatchQueue();
+native simulated function ConnectToPeers(out array<SessionMemberInfo> SessionListInfo);  // Export UPComPlayerController::execConnectToPeers(FFrame&, void* const)
 
-// Export UPComPlayerController::execOnAllMarketplaceProductDetailsRead(FFrame&, void* const)
-native function OnAllMarketplaceProductDetailsRead();
+native simulated function AcceptPartyInvite(string InviterName);  // Export UPComPlayerController::execAcceptPartyInvite(FFrame&, void* const)
 
-function AcknowledgePossession(Pawn P)
-{
-    //return;    
-}
+native simulated function ShowPrivilegeMessageAndDeclineInvite();  // Export UPComPlayerController::execShowPrivilegeMessageAndDeclineInvite(FFrame&, void* const)
 
-reliable server event ServerAcknowledgePossession(Pawn P)
-{
-    //return;    
-}
+native simulated function FilterFriendListForPeoplePicker(out array<OnlineFriend> FriendList, out array<SessionMemberInfo> SessionMemberList);  // Export UPComPlayerController::execFilterFriendListForPeoplePicker(FFrame&, void* const)
 
-simulated event QuitToMainMenu()
-{
-    //return;    
-}
+native function BlockPartySceneInput(bool bBlockInput);  // Export UPComPlayerController::execBlockPartySceneInput(FFrame&, void* const)
 
-function bool CleanupOnlineSubsystemSession(bool bWasFromMenu)
-{
-    //return ReturnValue;    
-}
+native simulated function UpdateMCTSSession(string SessionGuid, bool bIsHost);  // Export UPComPlayerController::execUpdateMCTSSession(FFrame&, void* const)
 
-function FinishQuitToMainMenu()
-{
-    //return;    
-}
+native function bool ArePartySessionInvitesAllowed();  // Export UPComPlayerController::execArePartySessionInvitesAllowed(FFrame&, void* const)
 
-function OnEndOnlineGameComplete(name SessionName, bool bWasSuccessful)
-{
-    //return;    
-}
+function bool ShouldPartySessionsBePublic() { }
 
-function OnDestroyOnlineGameComplete(name SessionName, bool bWasSuccessful)
-{
-    //return;    
-}
+native function ShowControllerDisconnectedWarning();  // Export UPComPlayerController::execShowControllerDisconnectedWarning(FFrame&, void* const)
 
-exec event ChooseThisControllerForSessionScout(bool bCustomMatch, int MaxPlayers, bool bPrivate, optional out array<UniqueNetId> ReservedMembers)
-{
-    //return;    
-}
+native function ShowNoFriendsForPartyInviteWarning();  // Export UPComPlayerController::execShowNoFriendsForPartyInviteWarning(FFrame&, void* const)
 
-simulated function OnCreateOnlineGameComplete(name SessionName, bool bWasSuccessful)
-{
-    //return;    
-}
+native function ShowUnableToReadFriendsListWarning();  // Export UPComPlayerController::execShowUnableToReadFriendsListWarning(FFrame&, void* const)
 
-reliable client simulated event ReceiveSessionInfo(byte PlatformSpecificInfo[80], WorldInfo.EConsoleType ConsoleType)
-{
-    //return;    
-}
+native function ShowPartyFullWarning(bool bPartySession);  // Export UPComPlayerController::execShowPartyFullWarning(FFrame&, void* const)
 
-simulated function OnJoinOnlineGameCompleteForReceivedSessionInfo(name SessionName, bool bWasSuccessful)
-{
-    //return;    
-}
+native function ShowPartyNoLongerAvailableWarning();  // Export UPComPlayerController::execShowPartyNoLongerAvailableWarning(FFrame&, void* const)
 
-simulated event RestablishVoiceForReconnect()
-{
-    //return;    
-}
+native function ShowPackageNotInstalledForPartyInviteWarning();  // Export UPComPlayerController::execShowPackageNotInstalledForPartyInviteWarning(FFrame&, void* const)
 
-// Export UPComPlayerController::execIsReconnect(FFrame&, void* const)
-native simulated function bool IsReconnect();
+native function ShowCustomGameDisallowedPopup();  // Export UPComPlayerController::execShowCustomGameDisallowedPopup(FFrame&, void* const)
 
-reliable server function ServerReEstablishP2PConnections()
-{
-    //return;    
-}
-
-reliable client simulated function ClientRestablishP2PConnections()
-{
-    //return;    
-}
-
-event RegisterOnlineDelegates()
-{
-    //return;    
-}
-
-event ClearOnlineDelegates()
-{
-    //return;    
-}
-
-// Export UPComPlayerController::execOnPrivilegeLevelChecked(FFrame&, void* const)
-//native function OnPrivilegeLevelChecked(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, OnlineSubsystem.EFeaturePrivilegeLevel PrivilegeLevel, bool bDiffersFromHint);
-
-// Export UPComPlayerController::execOnPrivilegeCheckedForUsersByUniqueNetIds(FFrame&, void* const)
-//native function OnPrivilegeCheckedForUsersByUniqueNetIds(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, array<PermissionsResultByUniqueNetId> Results);
-
-// Export UPComPlayerController::execOnContentPurchaseResponse(FFrame&, void* const)
-native function OnContentPurchaseResponse(bool bAuthorized, QWord qwOrderId);
-
-// Export UPComPlayerController::execUpdateMctsWithFriends(FFrame&, void* const)
-native function UpdateMctsWithFriends(bool bWasSuccessful);
-
-// Export UPComPlayerController::execRequestUpdateFriendsList(FFrame&, void* const)
-native function RequestUpdateFriendsList(optional bool bForceRequest = false);
-
-// Export UPComPlayerController::execOnTextFilterApplied(FFrame&, void* const)
-native function OnTextFilterApplied(string OriginalText, string FilteredText, bool bCensorCompletely);
-
-event bool CanCommunicateText(byte LocalUserNum, out OnlineSubsystem.EFeaturePrivilegeLevel PrivilegeLevelHint, optional bool bAttemptToResolve = false, optional string Reason = "")
-{
-    //return ReturnValue;    
-}
-
-event bool CanCommunicateTextWithUsersByUniqueNetIds(byte LocalUserNum, array<UniqueNetId> Users)
-{
-    //return ReturnValue;    
-}
-
-event bool CheckFilterText(string Text)
-{
-    //return ReturnValue;    
-}
-
-//function OnMultiplayerSessionChange(name SessionName, SessionUpdateInfo SessionChanges)
-//{
-    //return;    
-//}
-
-// Export UPComPlayerController::execIsPackageInstalled(FFrame&, void* const)
-native function bool IsPackageInstalled();
-
-// Export UPComPlayerController::execIsInGame(FFrame&, void* const)
-native function bool IsInGame();
-
-event PairLoggedInUserAndCurrentController()
-{
-    //return;    
-}
-
-event GetControllerIdFromNetId(UniqueNetId PlayerID, out int ControllerId)
-{
-    //return;    
-}
-
-simulated event LostP2PConnection(UniqueNetId UniqueId)
-{
-    //return;    
-}
-
-simulated exec event EstablishPeers()
-{
-    //return;    
-}
-
-// Export UPComPlayerController::execCloseConnectionsToInvalidPeers(FFrame&, void* const)
-//native simulated function CloseConnectionsToInvalidPeers(array<SessionMemberInfo> SessionListInfo);
-
-// Export UPComPlayerController::execGetUserNamesForPS4P2PConnections(FFrame&, void* const)
-native simulated function array<string> GetUserNamesForPS4P2PConnections();
-
-//simulated function OnGetUserConnectionInfoComplete(array<SessionMemberInfo> SessionListInfo, bool bWasSuccessful)
-//{
-    //return;    
-//}
-
-//simulated function OnGetSessionMemberInfoComplete(array<SessionMemberInfo> SessionListInfo, bool bWasSuccessful)
-//{
-    //return;    
-//}
-
-//simulated function OnGetVoicePermissionsForUsersComplete(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, array<PermissionsResult> Results)
-//{
-    //return;    
-//}
-
-event UnregisterP2PEnemiesForCustomMatch(array<UniqueNetId> EnemyIds)
-{
-    //return;    
-}
-
-simulated exec event CreatePartySession()
-{
-    //return;    
-}
-
-simulated function OnCreatePartySessionComplete(name SessionName, bool bSuccessful)
-{
-    //return;    
-}
-
-event bool InvitePlayerToPartyByName(string InPlayerName)
-{
-    //return ReturnValue;    
-}
-
-event bool InvitePlayerToParty(UniqueNetId InPlayerId)
-{
-    //return ReturnValue;    
-}
-
-simulated exec event DestroyPartySession()
-{
-    //return;    
-}
-
-simulated event OnPartySessionDestroyed(name SessionName, bool bWasSuccessful)
-{
-    //return;    
-}
-
-event JoinPartySession(byte PartySessionGuid[80])
-{
-    //return;    
-}
-
-simulated function OnGameInviteAccepted(const out OnlineGameSearchResult InviteResult)
-{
-    //return;    
-}
-
-//simulated function OnAlternatePrivilegeLevelCheckedComplete(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, OnlineSubsystem.EFeaturePrivilegeLevel PrivilegeLevel, bool bDiffersFromHint)
-//{
-    //return;    
-//}
-
-simulated function OnGameDestroyedForPartyJoin(name SessionName, bool bWasSuccessful)
-{
-    //return;    
-}
-
-//simulated function OnPrivilegeLevelCheckedCompleteForPartyJoin(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, OnlineSubsystem.EFeaturePrivilegeLevel PrivilegeLevel, bool bDiffersFromHint)
-//{
-    //return;    
-//}
-
-//simulated function OnPrivilegeCheckForGameSessionJoin(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, OnlineSubsystem.EFeaturePrivilegeLevel PrivilegeLevel, bool bDiffersFromHint)
-//{
-    //return;    
-//}
-
-simulated function OnJoinSessionForReceivedInviteComplete(name SessionName, bool bWasSuccessful)
-{
-    //return;    
-}
-
-event JoinCustomMatchFromInvite()
-{
-    //return;    
-}
-
-function JoinCustomMatchForInviteDelay()
-{
-    //return;    
-}
-
-simulated exec event bool ShowPeoplePickerUI()
-{
-    //return ReturnValue;    
-}
-
-function OnReadFriendsListComplete(bool bWasSuccessful)
-{
-    //return;    
-}
-
-function OnPeoplePickerComplete(bool bWasSuccessful, array<OnlineFriend> PeoplePicked)
-{
-    //return;    
-}
-
-simulated event bool IsHostOfParty()
-{
-    //return ReturnValue;    
-}
-
-simulated event UpdateMCTSWithNewPartyInfo()
-{
-    //return;    
-}
-
-simulated event TogglePartySessionInvitesAllowed(bool bAllowed)
-{
-    //return;    
-}
-
-simulated event ToggleGameSessionInvitesAllowed(bool bAllowed)
-{
-    //return;    
-}
-
-simulated event SetAsNewPartyHost()
-{
-    //return;    
-}
-
-event TryAutoLoginDelayed()
-{
-    //return;    
-}
-
-// Export UPComPlayerController::execTryAutoLogin(FFrame&, void* const)
-native function bool TryAutoLogin();
-
-reliable client simulated event ClientPlayInputLightingEffect(name InPresetName, optional bool bUseOverrideStartTime = false, optional float OverrideStartTime = 0.0000000)
-{
-    //return;    
-}
-
-// Export UPComPlayerController::execPlayInputLightingEffect(FFrame&, void* const)
-native function PlayInputLightingEffect(name InPresetName, optional bool bUseOverrideStartTime = false, optional float OverrideStartTime = 0.0000000);
-
-// Export UPComPlayerController::execStopInputLightingEffect(FFrame&, void* const)
-native function StopInputLightingEffect(name InPresetName);
-
-// Export UPComPlayerController::execSetCurrentTimeForInputLightingEffect(FFrame&, void* const)
-native function SetCurrentTimeForInputLightingEffect(name InPresetName, float InCurrentTime);
-
-exec event PlayTestInputLightingEffect(name InPresetName)
-{
-    //return;    
-}
+native function TryOpenPartyUI();  // Export UPComPlayerController::execTryOpenPartyUI(FFrame&, void* const)
+
+native function UpdatePartyUI();  // Export UPComPlayerController::execUpdatePartyUI(FFrame&, void* const)
+
+native function LeaveMatchQueue();  // Export UPComPlayerController::execLeaveMatchQueue(FFrame&, void* const)
+
+native function OnAllMarketplaceProductDetailsRead();  // Export UPComPlayerController::execOnAllMarketplaceProductDetailsRead(FFrame&, void* const)
+
+function AcknowledgePossession(Pawn P) { }
+
+simulated event QuitToMainMenu() { }
+
+function bool CleanupOnlineSubsystemSession(bool bWasFromMenu) { }
+
+function FinishQuitToMainMenu() { }
+
+function OnEndOnlineGameComplete(name SessionName, bool bWasSuccessful) { }
+
+function OnDestroyOnlineGameComplete(name SessionName, bool bWasSuccessful) { }
+
+exec event ChooseThisControllerForSessionScout(bool bCustomMatch, int MaxPlayers, bool bPrivate, optional out array<UniqueNetId> ReservedMembers) { }
+
+simulated function OnCreateOnlineGameComplete(name SessionName, bool bWasSuccessful) { }
+
+reliable client simulated event ReceiveSessionInfo(byte PlatformSpecificInfo[80], WorldInfo.EConsoleType ConsoleType) { }
+
+simulated function OnJoinOnlineGameCompleteForReceivedSessionInfo(name SessionName, bool bWasSuccessful) { }
+
+simulated event RestablishVoiceForReconnect() { }
+
+native simulated function bool IsReconnect();  // Export UPComPlayerController::execIsReconnect(FFrame&, void* const)
+
+reliable server function ServerReEstablishP2PConnections() { }
+
+reliable client simulated function ClientRestablishP2PConnections() { }
+
+event RegisterOnlineDelegates() { }
+
+event ClearOnlineDelegates() { }
+
+function OnMultiplayerSessionChange(name SessionName, SessionUpdateInfo SessionChanges) { }
+
+native function bool IsPackageInstalled();  // Export UPComPlayerController::execIsPackageInstalled(FFrame&, void* const)
+
+native function bool IsInGame();  // Export UPComPlayerController::execIsInGame(FFrame&, void* const)
+
+native function LogoutPlayer();  // Export UPComPlayerController::execLogoutPlayer(FFrame&, void* const)
+
+event PairLoggedInUserAndCurrentController() { }
+
+event GetControllerIdFromNetId(UniqueNetId PlayerID, out int ControllerId) { }
+
+simulated event LostP2PConnection(UniqueNetId UniqueId) { }
+
+simulated exec event EstablishPeers() { }
+
+native simulated function CloseConnectionsToInvalidPeers(array<SessionMemberInfo> SessionListInfo);  // Export UPComPlayerController::execCloseConnectionsToInvalidPeers(FFrame&, void* const)
+
+native simulated function array<string> GetUserNamesForPS4P2PConnections();  // Export UPComPlayerController::execGetUserNamesForPS4P2PConnections(FFrame&, void* const)
+
+simulated function OnGetUserConnectionInfoComplete(array<SessionMemberInfo> SessionListInfo, bool bWasSuccessful) { }
+
+simulated function OnGetSessionMemberInfoComplete(array<SessionMemberInfo> SessionListInfo, bool bWasSuccessful) { }
+
+simulated function OnGetVoicePermissionsForUsersComplete(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, array<PermissionsResult> Results) { }
+
+event UnregisterP2PEnemiesForCustomMatch(array<UniqueNetId> EnemyIds) { }
+
+simulated exec event CreatePartySession() { }
+
+simulated function OnCreatePartySessionComplete(name SessionName, bool bSuccessful) { }
+
+event InvitePlayerToPartyByName(string InPlayerName) { }
+
+event InvitePlayerToParty(UniqueNetId InPlayerId) { }
+
+simulated exec event DestroyPartySession() { }
+
+simulated function OnPartySessionDestroyed(name SessionName, bool bWasSuccessful) { }
+
+simulated function OnGameInviteAccepted(const out OnlineGameSearchResult InviteResult) { }
+
+simulated function OnAlternatePrivilegeLevelCheckedComplete(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, OnlineSubsystem.EFeaturePrivilegeLevel PrivilegeLevel, bool bDiffersFromHint) { }
+
+simulated function OnGameDestroyedForPartyJoin(name SessionName, bool bWasSuccessful) { }
+
+simulated function OnPrivilegeLevelCheckedCompleteForPartyJoin(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, OnlineSubsystem.EFeaturePrivilegeLevel PrivilegeLevel, bool bDiffersFromHint) { }
+
+simulated function OnPrivilegeCheckForGameSessionJoin(byte LocalUserNum, OnlineSubsystem.EFeaturePrivilege Privilege, OnlineSubsystem.EFeaturePrivilegeLevel PrivilegeLevel, bool bDiffersFromHint) { }
+
+simulated function OnJoinSessionForReceivedInviteComplete(name SessionName, bool bWasSuccessful) { }
+
+event JoinCustomMatchFromInvite() { }
+
+function JoinCustomMatchForInviteDelay() { }
+
+simulated exec event bool ShowPeoplePickerUI() { }
+
+function OnReadFriendsListComplete(bool bWasSuccessful) { }
+
+function OnPeoplePickerComplete(bool bWasSuccessful, array<OnlineFriend> PeoplePicked) { }
+
+simulated event bool IsHostOfParty() { }
+
+simulated event UpdateMCTSWithNewPartyInfo() { }
+
+simulated event TogglePartySessionInvitesAllowed(bool bAllowed) { }
+
+simulated event ToggleGameSessionInvitesAllowed(bool bAllowed) { }
+
+simulated event SetAsNewPartyHost() { }
+
+event TryAutoLoginDelayed() { }
+
+native function bool TryAutoLogin();  // Export UPComPlayerController::execTryAutoLogin(FFrame&, void* const)
+
+reliable client simulated event ClientPlayInputLightingEffect(name InPresetName, optional bool bUseOverrideStartTime=false, optional float OverrideStartTime=0.0000000) { }
+
+native function PlayInputLightingEffect(name InPresetName, optional bool bUseOverrideStartTime=false, optional float OverrideStartTime=0.0000000);  // Export UPComPlayerController::execPlayInputLightingEffect(FFrame&, void* const)
+
+native function StopInputLightingEffect(name InPresetName);  // Export UPComPlayerController::execStopInputLightingEffect(FFrame&, void* const)
+
+native function SetCurrentTimeForInputLightingEffect(name InPresetName, float InCurrentTime);  // Export UPComPlayerController::execSetCurrentTimeForInputLightingEffect(FFrame&, void* const)
+
+exec event PlayTestInputLightingEffect(name InPresetName) { }
 
 defaultproperties
-{
-    PartySessionName="Party"
-    GameSessionName="Game"
-    InputClass=Class'PComPlayerInput'
-    
-    // remove?
-    CylinderComponent=CollisionCylinder
-    Components(0)=CollisionCylinder
-    CollisionComponent=CollisionCylinder
-}
+{}

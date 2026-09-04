@@ -1,3 +1,4 @@
 class SearFiles extends Commandlet
     transient
-    native;
+    native
+    config(Engine);

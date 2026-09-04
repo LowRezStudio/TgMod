@@ -1,36 +1,22 @@
 class PComPlayerProfile extends OnlinePlayerStorage
-    native;
+    native
+    config(Engine);
 
-struct native PropertyPair
-{
+struct PropertyPair {
     var int PropertyId;
     var int Value;
-
-    structdefaultproperties
-    {
-        PropertyId=0
-        Value=0
-    }
+    structdefaultproperties {}
 };
 
-struct native AccoladeStruct
-{
+struct AccoladeStruct {
     var int AccoladeId;
     var int ActivityId;
     var int Type;
     var int Value;
-
-    structdefaultproperties
-    {
-        AccoladeId=0
-        ActivityId=0
-        Type=0
-        Value=0
-    }
+    structdefaultproperties {}
 };
 
-struct native BadgeStruct
-{
+struct BadgeStruct {
     var int BadgeId;
     var int ActivityId;
     var int Icon;
@@ -40,19 +26,7 @@ struct native BadgeStruct
     var int Category;
     var init string Title;
     var init string Description;
-
-    structdefaultproperties
-    {
-        BadgeId=0
-        ActivityId=0
-        Icon=0
-        Tier=0
-        Progress=0
-        MaxValue=0
-        Category=0
-        Title=""
-        Description=""
-    }
+    structdefaultproperties {}
 };
 
 var int Rank;

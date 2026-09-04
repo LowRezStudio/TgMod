@@ -1,24 +1,19 @@
 class InterpTrackAkEvent extends InterpTrack
     native
     collapsecategories
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-struct native AkEventTrackKey
-{
+struct AkEventTrackKey {
     var float Time;
-    var() AkEvent Event;
-
-    structdefaultproperties
-    {
-        Time=0.0000000
-        Event=none
-    }
+    var () AkEvent Event;
+    structdefaultproperties {}
 };
 
 var array<AkEventTrackKey> AkEvents;
 
 defaultproperties
 {
-    TrackInstClass=Class'AkAudio.InterpTrackInstAkEvent'
+    TrackInstClass=Class'InterpTrackInstAkEvent'
     TrackTitle="AkEvent"
 }

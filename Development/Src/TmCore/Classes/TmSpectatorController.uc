@@ -1,0 +1,680 @@
+class TmSpectatorController extends TgSpectatorController
+    config(Game)
+    hidecategories(Navigation)
+    dependson(TgObject, TmAbilityHud);
+
+var transient bool bClonedHUD;
+var transient int LastClonedTickCount;
+var transient int bBorderBuilt;
+
+// Pawn currently forced into the client-side first person rig, if any.
+var transient TgPawn m_NudgedFpPawn;
+// Last known mounted state of the nudged pawn (edge detection for the manual mount presentation).
+var transient bool m_bWasMounted;
+// True while inside a mount/emote third person window.
+var transient bool m_bWasWindow3P;
+// If false, disable the server-side relevancy viewpoint override.
+var config bool c_bTrackViewTargetForRelevancy;
+
+// Client render module for the ability bar: owns all per-target caches.
+var transient TmAbilityHud AbilityHud;
+
+// Server-sampled ability state, replicated to the spec client
+var repnotify TmAbilityState r_Abilities[5];
+var repnotify int r_UltCharge;   // r_nUltimateCharge doesn't reliably replicate to spec clients
+
+// Cast bars (server-sampled), ms precision so the client can extrapolate like the native HUD
+var repnotify int r_CastIds[3];      // device ids currently casting (0 = slot empty)
+var repnotify int r_CastCurMs[3];    // elapsed cast time in ms per bar
+var repnotify int r_CastRateMs[3];   // total cast time in ms per bar (0 = inactive)
+var repnotify string r_CastNames[3]; // device display names, SetTextEx'd onto the bar clip
+var transient TgPawn LastSkillsViewPawn; // ability-bar latches reset whenever the followed pawn changes
+
+simulated function ForwardToSpectatingMatch()
+{
+    super.ForwardToSpectatingMatch();
+    if (WorldInfo.NetMode != NM_DedicatedServer)
+        SetSpectatorCameraMode(SpectatorCameraMode.SpecCam_FollowThirdPerson);
+}
+
+public function Class<HUD> GetHudClass(Class<HUD> pNewHudType)
+{
+    return Class'TgClient.TgGameHUD';
+}
+
+exec function SpecToggleFirstPerson()
+{
+    if (int(m_CameraMode) == int(SpectatorCameraMode.SpecCam_FollowFirstPerson))
+        SetSpectatorCameraMode(SpectatorCameraMode.SpecCam_FollowThirdPerson);
+    else
+        SetSpectatorCameraMode(SpectatorCameraMode.SpecCam_FollowFirstPerson);
+}
+
+// Same bookkeeping as the stock mode 3 handler, but swaps in our own camera
+// module so the POV is driven from script instead of the native gate.
+exec function SetSpectatorCameraMode(TgSpectatorController.SpectatorCameraMode Mode, optional bool bCameraTween = false)
+{
+    if (int(Mode) != int(SpectatorCameraMode.SpecCam_FollowFirstPerson))
+    {
+        super.SetSpectatorCameraMode(Mode, bCameraTween);
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    if (int(Mode) == int(m_CameraMode))
+        return;
+
+    m_CameraMode = Mode;
+    m_bIsMapSquashed = false;
+    if (bCameraTween)
+        TgPlayerCamera(PlayerCamera).SwitchCameras(class'TmCore.TmCameraModule_SpectatorFirstPerson', 0.2);
+    else
+        TgPlayerCamera(PlayerCamera).SwitchCameras(class'TmCore.TmCameraModule_SpectatorFirstPerson');
+}
+
+// The single per-frame interface: the viewport client calls only this.
+simulated function TickSpectatorHUD()
+{
+    UpdateFirstPersonNudge();
+    TickSpectatorPlayerHUD();
+    TickSpectatorTeamHUD();
+    TickBurnsHud();
+    TickAbilitiesHud();
+}
+
+// --- view target resolution (the one PRI/pawn answer for every HUD ticker) ---
+
+// The spectated pawn; bPendingFallback keeps the camera transition target
+// while a view-target switch is mid-flight.
+simulated function TgPawn ViewTargetPawn(optional bool bPendingFallback)
+{
+    local TgPawn P;
+
+    P = TgPawn(GetViewTarget());
+    if (P == none && bPendingFallback && PlayerCamera != none)
+        P = TgPawn(PlayerCamera.PendingViewTarget.Target); // mid-transition lock
+    return P;
+}
+
+// PRI of whoever we're watching, falling back to our own PRI (no target).
+simulated function TgRepInfo_Player ViewTargetPRI(optional bool bPendingFallback)
+{
+    local TgPawn P;
+
+    P = ViewTargetPawn(bPendingFallback);
+    if (P != none)
+        return TgRepInfo_Player(P.PlayerReplicationInfo);
+    return TgRepInfo_Player(PlayerReplicationInfo);
+}
+
+// Assigning this local controller to the pawn opens the native first person
+// gate. Local on purpose: remote stand-ins suppress tracers/explosions, and
+// the assignment never replicates, so the server keeps authority.
+simulated function UpdateFirstPersonNudge()
+{
+    local TgPawn ViewPawn;
+    local bool bNativeFP;
+
+    if (m_CameraMode != SpectatorCameraMode.SpecCam_FollowFirstPerson)
+    {
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    ViewPawn = TgPawn(GetViewTarget());
+    // Fake Controller assignment only safe on simulated proxies (listen server owns the pawn).
+    if (ViewPawn == none || !ViewPawn.IsAliveAndWell() || ViewPawn.Role >= ROLE_Authority)
+    {
+        ClearFirstPersonNudge();
+        return;
+    }
+
+    if (m_NudgedFpPawn != none && m_NudgedFpPawn != ViewPawn)
+        ClearFirstPersonNudge();
+
+    m_NudgedFpPawn = ViewPawn;
+    ViewPawn.Controller = self;
+    m_bBehindView = false;
+
+    // Mounts: drive effects manually off r_bIsMounted, transitions only or
+    // the dismount replays every frame.
+    if (ViewPawn.r_bIsMounted != m_bWasMounted)
+    {
+        m_bWasMounted = ViewPawn.r_bIsMounted;
+        if (ViewPawn.r_bIsMounted)
+            ViewPawn.PlayMountingEffects(false, ViewPawn.r_bUseMountPosture);
+        else
+            ViewPawn.StopMountingEffects(true, ViewPawn.r_bUseMountPosture);
+    }
+
+
+    bNativeFP = !ViewPawn.r_bIsMounted
+        && !IsForced3PAbilityDevice(ViewPawn)
+        && ViewPawn.ShouldBeFirstPersonThisTick();
+    m_bBehindView = !bNativeFP;
+
+    SetRealModelHidden(ViewPawn, bNativeFP);
+    SetRigVisible(ViewPawn, bNativeFP);
+    SetForced3PPose(!bNativeFP);
+}
+
+// Devices don't replicate to spectators, but c_EquipFormState per equip point
+// does, so third person windows come from the champion catalog's forced-3P
+// tables instead of device checks.
+simulated function bool IsForced3PAbilityDevice(TgPawn ViewPawn)
+{
+    local int Mask;
+
+    //Cinnamon: 7 = emote. Handle emotes before anything else.
+    if (ViewPawn.c_EquipFormState[7] == 'DeviceFiring' || ViewPawn.c_EquipFormState[7] == 'DeviceBuilding')
+        return true;
+
+    // Bit 16 = RMB ability, bit 4 = F ability, bit 3 = Q ability, bit 2 = E ability.
+    Mask = class'TmCore.TmChampions'.static.Force3PSlotMask(ViewPawn)
+        | class'TmCore.TmChampions'.static.Force3PUltSlotMask(ViewPawn);
+    if (Mask == 0)
+        return false;
+
+    if ((Mask & (1 << 16)) != 0 && (ViewPawn.c_EquipFormState[16] == 'DeviceFiring' || ViewPawn.c_EquipFormState[16] == 'DeviceBuilding'))
+        return true;
+    if ((Mask & (1 << 4)) != 0 && (ViewPawn.c_EquipFormState[4] == 'DeviceFiring' || ViewPawn.c_EquipFormState[4] == 'DeviceBuilding'))
+        return true;
+    if ((Mask & (1 << 3)) != 0 && (ViewPawn.c_EquipFormState[3] == 'DeviceFiring' || ViewPawn.c_EquipFormState[3] == 'DeviceBuilding'))
+        return true;
+    if ((Mask & (1 << 2)) != 0 && (ViewPawn.c_EquipFormState[2] == 'DeviceFiring' || ViewPawn.c_EquipFormState[2] == 'DeviceBuilding'))
+        return true;
+    return false;
+}
+
+simulated function SetForced3PPose(bool bForced3P)
+{
+    local TmCameraModule_SpectatorFirstPerson CamMod;
+
+    if (PlayerCamera == none)
+        return;
+    CamMod = TmCameraModule_SpectatorFirstPerson(TgPlayerCamera(PlayerCamera).CurrentCameraMod);
+    if (CamMod != none)
+        CamMod.SetForced3P(bForced3P);
+}
+
+// Actor-level bHidden is absolute and survives the pawn re-asserting
+// per-component visibility every tick. The mount mesh is skipped;
+// PlayMountingEffects owns its lifecycle.
+simulated function SetRealModelHidden(TgPawn ViewPawn, bool bHidden)
+{
+    local PrimitiveComponent Prim;
+
+    ViewPawn.SetHidden(bHidden);
+    foreach ViewPawn.ComponentList(class'PrimitiveComponent', Prim)
+    {
+        if (!bHidden && Prim == ViewPawn.m_MountMesh)
+            continue;
+        Prim.SetHidden(bHidden);
+    }
+}
+
+// Park or restore the first person rig for third person ticks. Native
+// OwnerNoSee toggles keep flipping state, so absolute SetHidden sticks.
+simulated function SetRigVisible(TgPawn ViewPawn, bool bVisible)
+{
+    local TgWeaponMeshActor WMA;
+    local PrimitiveComponent Prim;
+    local int i;
+
+    WMA = ViewPawn.m_WeaponMesh;
+    if (WMA == none)
+        return;
+
+    if (bVisible)
+    {
+        // Restore the rig plus everything it owns (weapon glows live there).
+        foreach WMA.AllOwnedComponents(class'PrimitiveComponent', Prim)
+            Prim.SetHidden(false);
+        if (WMA.m_WeaponMesh1P != none)
+            WMA.m_WeaponMesh1P.FxActivateGroup('AlwaysOn', 0);
+        if (WMA.m_HandsMesh != none)
+            WMA.m_HandsMesh.FxActivateGroup('AlwaysOn', 0);
+        if (WMA.m_HeadMesh1P != none)
+            WMA.m_HeadMesh1P.FxActivateGroup('AlwaysOn', 0);
+        SetRigOverlaysVisible(ViewPawn, true);
+        return;
+    }
+
+    // Park everything weapon related for third person ticks.
+    WMA.Set1PAttachState(2);
+    if (WMA.m_WeaponMesh1P != none)
+    {
+        WMA.m_WeaponMesh1P.SetHidden(true);
+        WMA.m_WeaponMesh1P.FxDeactivateGroup('AlwaysOn', 0);
+    }
+    if (WMA.m_HandsMesh != none)
+    {
+        WMA.m_HandsMesh.SetHidden(true);
+        WMA.m_HandsMesh.FxDeactivateGroup('AlwaysOn', 0);
+    }
+    if (WMA.m_HeadMesh1P != none)
+    {
+        WMA.m_HeadMesh1P.SetHidden(true);
+        WMA.m_HeadMesh1P.FxDeactivateGroup('AlwaysOn', 0);
+    }
+    if (WMA.m_WeaponMesh3P != none)
+        WMA.m_WeaponMesh3P.SetHidden(true);
+
+    // Particles ignore their parent's hidden flag, so sweep everything the rig owns.
+    foreach WMA.AllOwnedComponents(class'PrimitiveComponent', Prim)
+        Prim.SetHidden(true);
+
+    SetRigOverlaysVisible(ViewPawn, false);
+}
+
+// Hides/shows the overlay duplicate meshes parented to the first person
+// pieces (skin/shield overlays render independently of their parent's flag).
+simulated function SetRigOverlaysVisible(TgPawn ViewPawn, bool bVisible)
+{
+    local int i;
+    local TgWeaponMeshActor WMA;
+
+    WMA = ViewPawn.m_WeaponMesh;
+    if (WMA == none)
+        return;
+
+    for (i = 0; i < ViewPawn.m_OverlayInfosBody.Length; i++)
+    {
+        if (ViewPawn.m_OverlayInfosBody[i].ParentMesh == WMA.m_HandsMesh
+            || ViewPawn.m_OverlayInfosBody[i].ParentMesh == WMA.m_HeadMesh1P)
+            ViewPawn.m_OverlayInfosBody[i].OverlayMesh.SetHidden(!bVisible);
+    }
+    for (i = 0; i < ViewPawn.m_OverlayInfosWeapon.Length; i++)
+    {
+        if (ViewPawn.m_OverlayInfosWeapon[i].ParentMesh == WMA.m_WeaponMesh1P)
+            ViewPawn.m_OverlayInfosWeapon[i].OverlayMesh.SetHidden(!bVisible);
+    }
+}
+
+// Relevancy is computed from GetPlayerViewPoint; flag-gated override to track
+// the view target instead.
+simulated event GetPlayerViewPoint(out Vector out_Location, out Rotator out_Rotation)
+{
+    local Actor VT;
+
+    if (c_bTrackViewTargetForRelevancy && Role == ROLE_Authority && WorldInfo.NetMode != NM_Client)
+    {
+        VT = GetViewTarget();
+        if (VT != none)
+        {
+            out_Location = VT.Location;
+            out_Rotation = VT.Rotation;
+            return;
+        }
+    }
+    super.GetPlayerViewPoint(out_Location, out_Rotation);
+}
+
+function SpectatorSetViewTarget(Actor VT, optional ViewTargetTransitionParams TransitionParams)
+{
+    ClearFirstPersonNudge();
+    super.SpectatorSetViewTarget(VT, TransitionParams);
+    if (Role == ROLE_Authority)
+    {
+        TickFollowAbilities(); // sample the new target now; r_Abilities still holds the old one
+        SetTimer(0.15, true, 'TickFollowAbilities');
+    }
+}
+
+function TickFollowAbilities()
+{
+    local TgPawn ViewPawn;
+    local TgDevice Dev;
+    local TmAbilityState S[5];
+    local int i, eq;
+
+    if (Role != ROLE_Authority)
+    {
+        ClearTimer('TickFollowAbilities');
+        return;
+    }
+    ViewPawn = TgPawn(GetViewTarget());
+    if (ViewPawn == none)
+        return;
+
+    for (i = 0; i < 5; i++)
+    {
+        eq = `ABILITYHUD.GetSkillEqPoint(i);
+        S[i].DeviceId = 0;
+        S[i].Ammo = 0;
+        S[i].AmmoMax = 0;
+        S[i].CooldownPct = 0;
+        S[i].CooldownSecs = 0;
+        S[i].Status = 2; // ready default
+
+        // PRI r_PlayerDevices is only a fallback (horse pre-mount has no live device)
+        Dev = ViewPawn.GetDeviceByEqPoint(eq);
+        if (Dev != none)
+            S[i].DeviceId = Dev.r_nDeviceId;
+        if (S[i].DeviceId == 0 && ViewPawn.PlayerReplicationInfo != none)
+            S[i].DeviceId = TgRepInfo_Player(ViewPawn.PlayerReplicationInfo).r_PlayerDevices[eq].CurrentDeviceId;
+
+        if (Dev != none)
+            `ABILITYHUD.SampleAbilityState(Dev, S[i]);
+        else if (S[i].DeviceId != 0)
+            S[i].Status = 1; // id known but no live device (horse pre-mount etc.) -> locked look
+
+        if (S[i] != r_Abilities[i])
+            r_Abilities[i] = S[i];
+    }
+
+    if (ViewPawn.PlayerReplicationInfo != none)
+        r_UltCharge = TgRepInfo_Player(ViewPawn.PlayerReplicationInfo).r_nUltimateCharge;
+
+    UpdateCastBars(ViewPawn);
+}
+
+// Server-side cast bar sampling: up to 3 bars, ms precision for client-side fill
+function UpdateCastBars(TgPawn ViewPawn)
+{
+    local int i, eq, NumBars, CurMs, RateMs;
+    local TgDevice Dev;
+    local int Ids[3];
+    local string Names[3];
+
+    for (i = 0; i < 5 && NumBars < 3; i++)
+    {
+        eq = `ABILITYHUD.GetSkillEqPoint(i);
+        Dev = ViewPawn.GetDeviceByEqPoint(eq);
+        if (Dev == none || !Dev.IsAbility())
+            continue;
+
+        CurMs = 0;
+        RateMs = 0;
+        `ABILITYHUD.SampleCastBar(Dev, CurMs, RateMs);
+        if (RateMs <= 0)
+            continue;
+
+        Ids[NumBars] = Dev.r_nDeviceId;
+        Names[NumBars] = Dev.GetDeviceName();
+        r_CastCurMs[NumBars] = CurMs;
+        r_CastRateMs[NumBars] = RateMs;
+        NumBars++;
+    }
+
+    for (i = 0; i < 3; i++)
+    {
+        if (i < NumBars)
+        {
+            if (r_CastIds[i] != Ids[i] || r_CastNames[i] != Names[i])
+            {
+                r_CastIds[i] = Ids[i];
+                r_CastNames[i] = Names[i];
+            }
+            if (r_CastRateMs[i] != 0 && r_CastCurMs[i] > r_CastRateMs[i])
+                r_CastCurMs[i] = r_CastRateMs[i];
+        }
+        else if (r_CastIds[i] != 0)
+        {
+            r_CastIds[i] = 0;
+            r_CastCurMs[i] = 0;
+            r_CastRateMs[i] = 0;
+            r_CastNames[i] = "";
+        }
+    }
+}
+
+replication
+{
+    if (bNetDirty)
+        r_Abilities, r_UltCharge, r_CastIds, r_CastCurMs, r_CastRateMs, r_CastNames;
+}
+
+simulated function ClearFirstPersonNudge()
+{
+    local TgPawn Nudged;
+
+    if (m_NudgedFpPawn == none)
+        return;
+
+    Nudged = m_NudgedFpPawn;
+    m_NudgedFpPawn = none;
+    m_bWasMounted = false;
+
+    SetRealModelHidden(Nudged, false);
+    SetRigVisible(Nudged, true);
+    SetForced3PPose(false);
+    if (Nudged.Controller == self)
+        Nudged.Controller = none;
+    m_bBehindView = true;
+}
+
+simulated function TickBurnsHud()
+{
+    local UIHudCards CardsHUD;
+    local UIHudBurns BurnHUD;
+    local TgPawn ViewPawn;
+    local TgRepInfo_Player ViewPRI;
+    local int DeviceIds[4], Powers[4];
+
+    CardsHUD = UIHudCards(`UTILS.FindSceneByClassName(TgGameHUD(myHUD), 'UIHudCards'));
+    if (CardsHUD == none)
+        return;
+    BurnHUD = UIHudBurns(`UTILS.FindSceneByClassName(TgGameHUD(myHUD), 'UIHudBurns'));
+
+    ViewPawn = ViewTargetPawn(false);
+    ViewPRI = ViewTargetPRI(false);
+    if (ViewPRI == none)
+        ViewPRI = TgRepInfo_Player(PlayerReplicationInfo);
+
+    `UIUTILS.GetSpectatedBurnIds(ViewPRI, ViewPawn, DeviceIds, Powers);
+
+    `UIUTILS.SyncBurnsToScene(CardsHUD, BurnHUD, DeviceIds, Powers);
+}
+
+simulated function TickAbilitiesHud()
+{
+    local UIHudSkills SkillsHUD;
+    local TgPawn ViewPawn;
+    local int UltCharge;
+    local TgRepInfo_Player PRI;
+
+    SkillsHUD = UIHudSkills(`UTILS.FindSceneByClassName(TgGameHUD(myHUD), 'UIHudSkills'));
+    if (SkillsHUD == none)
+        return;
+
+    if (AbilityHud == none)
+        AbilityHud = new (self) class'TmCore.TmAbilityHud';
+
+    ViewPawn = ViewTargetPawn(true); // pending fallback covers a mid-transition lock
+
+    // Target switch: drop per-target latches or the first paint uses stale state.
+    if (ViewPawn != LastSkillsViewPawn)
+    {
+        LastSkillsViewPawn = ViewPawn;
+        AbilityHud.ResetForTarget();
+    }
+
+    if (ViewPawn == none)
+    {
+        AbilityHud.BlankScene(SkillsHUD);
+        return;
+    }
+
+    // Server-sampled r_UltCharge is authoritative; PRI value only as fallback.
+    PRI = ViewTargetPRI(false);
+    if (r_UltCharge > 0)
+        UltCharge = r_UltCharge;
+    else if (PRI != none)
+        UltCharge = PRI.r_nUltimateCharge;
+    else
+        UltCharge = 0;
+
+    // The game hides the ability bar for spectators up the clip chain - force it visible every tick.
+    `ABILITYHUD.ForceSkillsVisible(SkillsHUD);
+
+    AbilityHud.SyncToScene(SkillsHUD, ViewPawn, r_Abilities, UltCharge,
+        r_CastIds, r_CastCurMs, r_CastRateMs, r_CastNames);
+}
+
+simulated function TickSpectatorPlayerHUD()
+{
+    local UIHudPlayer HUD;
+    local TgPawn ViewPawn;
+    local TgRepInfo_Player PRI, SPRI;
+    local GFxObject Group, OgGroup;
+    local GFxObject HealthBarTickContainer;
+    local UIComponent_HealthBar OgHealthBar;
+    local int TaskForce;
+
+    HUD = UIHudPlayer(`UTILS.FindSceneByClassName(TgGameHUD(myHUD), 'UIHudPlayer'));
+    if (HUD == none) return;
+
+    if (!bClonedHUD)
+    {
+        Group = HUD.AttachMovie("UIHudPlayer", "TmUIHudPlayer", 50).GetObject("Group");
+        bClonedHUD = true;
+    }
+    else
+        Group = HUD.GetObject("TmUIHudPlayer").GetObject("Group");
+
+    SPRI = TgRepInfo_Player(PlayerReplicationInfo);
+    if (SPRI == none) return;
+
+    ViewPawn = ViewTargetPawn(false);
+    if (ViewPawn == none)
+    {
+        Group.SetVisible(false);
+        return;
+    }
+
+    PRI = TgRepInfo_Player(ViewPawn.PlayerReplicationInfo);
+    if (PRI == none) return;
+
+    TaskForce = PRI.GetTaskForceNumber();
+
+    OgGroup = HUD.GetObject("Group");
+    OgGroup.SetAlpha(0.0);
+    OgGroup.SetVisible(false);
+
+    OgHealthBar = HUD.m_HealthBar.m_DamageOverlay.m_HealthbarOwner;
+
+    Group.SetVisible(true);
+    Group.GotoAndStopI(TaskForce);
+    `UIUTILS.SetGameText(Group.GetObject("SpectatorName").GetObject("TF"), PRI.PlayerName);
+    `UIUTILS.SetGameText(Group.GetObject("SpectatorName").GetObject("TeamName").GetObject("TF"), TaskForce == 1 ? "Blue Team" : "Red Team");
+    Group.GetObject("SpectatorName").GetObject("TeamName").GotoAndStopI(TaskForce);
+    Group.GetObject("SpectatorName").GetObject("Frame").GotoAndStopI(TaskForce);
+
+    `UIUTILS.MirrorClip(Group, OgGroup, "HealthDamageOverlay");
+    `UIUTILS.MirrorClip(Group, OgGroup, "HealthDamageOverlayNormal");
+    `UIUTILS.MirrorClip(Group, OgGroup, "HealthBarTickContainer");
+    `UIUTILS.MirrorClip(Group, OgGroup, "HealthBorderTickMask");
+    `UIUTILS.MirrorClip(Group, OgGroup, "HealthBorderTickContainer");
+    `UIUTILS.MirrorClip(Group, OgGroup, "ShieldBorderTickMask");
+    `UIUTILS.MirrorClip(Group, OgGroup, "ShieldBorderTickContainer");
+    `UIUTILS.MirrorClip(Group, OgGroup, "ShadowBorderTickMask");
+    `UIUTILS.MirrorClip(Group, OgGroup, "ShadowBorderTickContainer");
+
+    HealthBarTickContainer = Group.GetObject("HealthBarTickContainer");
+
+    `UIUTILS.MirrorText(Group.GetObject("Now"), OgGroup.GetObject("Now"));
+    `UIUTILS.MirrorText(Group.GetObject("Max"), OgGroup.GetObject("Max"));
+    if (Group.GetObject("Tip") != none && OgGroup.GetObject("Tip") != none)
+        Group.GetObject("Tip").SetDisplayInfo(OgGroup.GetObject("Tip").GetDisplayInfo());
+
+    Group.GetObject("Streak").SetVisible(int(Group.GetObject("Streak").GetObject("Title").GetText()) > 0);
+
+    `UIUTILS.SetGameText(Group.GetObject("Streak").GetObject("Title"), PRI.r_nKillstreak);
+    `UIUTILS.SetGameText(Group.GetObject("Streak").GetObject("Subtitle"), "STREAK");
+
+    `UIUTILS.BuildFillTicks(OgHealthBar, HealthBarTickContainer, TaskForce, LastClonedTickCount);
+    `UIUTILS.BuildBorderTicks(OgHealthBar, Group, TaskForce, bBorderBuilt);
+    `UIUTILS.MirrorBarMasks(OgHealthBar, OgGroup, Group);
+    `UIUTILS.RecolorHealthTicks(OgHealthBar, HealthBarTickContainer, TaskForce);
+
+    `UIUTILS.SyncShieldText(OgGroup, Group);
+    `UIUTILS.SyncCombat(OgGroup, Group);
+    `UIUTILS.SyncHealFeedContainer(OgGroup, Group);
+
+    SPRI.r_nProfileId = PRI.r_nProfileId;
+    SPRI.r_nCredits = PRI.r_nCredits;
+    SPRI.r_nEarnedCredits = PRI.r_nEarnedCredits;
+
+    if (PRI.r_nProfileId > 0)
+        `UIUTILS.SyncIcon(Group.GetObject("Icon"), HUD.m_mcIcon);
+}
+
+simulated function TickSpectatorTeamHUD()
+{
+    local UIHudTeam HUD;
+    local TgPawn ViewPawn;
+    local TgRepInfo_Player PRI, SPRI;
+    local array<TgRepInfo_Player> Players;
+    local GFxObject RedPlayer, Health, HealthBG, HealthTip, UltText, UltReady;
+    local float HpPct;
+    local int i, Charge, bFull;
+
+    TgRepInfo_Game(WorldInfo.GRI).GetTaskForce(2).GetPlayers(Players);
+    HUD = UIHudTeam(`UTILS.FindSceneByClassName(TgGameHUD(myHUD), 'UIHudTeam'));
+    if (HUD == none) return;
+    SPRI = TgRepInfo_Player(PlayerReplicationInfo);
+    if (SPRI == none) return;
+    ViewPawn = ViewTargetPawn(false);
+    if (ViewPawn == none) return;
+    PRI = TgRepInfo_Player(ViewPawn.PlayerReplicationInfo);
+    if (PRI == none) return;
+    for (i = 0; i < Players.Length; i++)
+    {
+        RedPlayer = HUD.m_mcPlayers.GetObject("Red" $ i);
+        Health = RedPlayer.GetObject("Health");
+        HealthBG = RedPlayer.GetObject("HealthBG");
+        HealthTip = RedPlayer.GetObject("HealthTip");
+        HealthBG.SetVisible(true);
+        HealthBG.SetAlpha(85.0);
+        Health.SetVisible(true);
+        HpPct = Players[i].r_nHealthMaximum > 0 ? float(Players[i].r_nHealthCurrent) / float(Players[i].r_nHealthMaximum) : 0.0;
+        HUD.Animate(Health, 0.2, UIANIM_WIDTH, HpPct * 78);
+        Health.SetAlpha(100.0);
+        // Tip rides the bar edge; hidden at 0 health, like native.
+        if (Players[i].r_nHealthCurrent > 0 && HealthTip != none)
+        {
+            HealthTip.SetVisible(true);
+            HUD.Animate(HealthTip, 0.2, UIANIM_X, (HpPct * 78) - 39);
+            HealthTip.SetAlpha(100.0);
+        }
+        else if (HealthTip != none && HealthTip.GetBool("_visible"))
+            HealthTip.SetVisible(false);
+
+        // Ult = base icon + charge text, always shown. UltReady = glow, only at
+        // full. Native TickPlayers also writes these rows (it fades Ult out at
+        // charge 0), so Ult gets snapped visible instead of faded. The glow
+        // fades, but never mid-fade; restarting one per tick makes it pulse.
+        if (i < 5)
+        {
+            Charge = Players[i].r_nUltimateCharge;
+            UltText = RedPlayer.GetObject("Ult");
+            UltReady = RedPlayer.GetObject("UltReady");
+            bFull = Charge >= 100 ? 1 : 0;
+            if (UltText != none)
+            {
+                UltText.SetVisible(true);
+                UltText.SetAlpha(100.0);
+                `UIUTILS.SetGameText(UltText, string(Clamp(Charge, 0, 100)) $ "%");
+            }
+            if (UltReady != none && !HUD.IsAnimatingType(UltReady, UIANIM_ALPHA))
+            {
+                if (bFull == 1 && UltReady.GetFloat("_alpha") < 99.0)
+                {
+                    HUD.CancelAnim(UltReady);
+                    HUD.FadeIn(UltReady, 0.25);
+                }
+                else if (bFull == 0 && UltReady.GetFloat("_alpha") > 1.0)
+                {
+                    HUD.CancelAnim(UltReady);
+                    HUD.FadeOut(UltReady, 0.25);
+                }
+            }
+        }
+    }
+}
+
+defaultproperties
+{
+    c_bTrackViewTargetForRelevancy=true
+}

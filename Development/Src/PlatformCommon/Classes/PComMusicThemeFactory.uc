@@ -1,6 +1,7 @@
 class PComMusicThemeFactory extends Factory
     transient
-    native(Audio);
+    native(Audio)
+    config(Engine);
 
 defaultproperties
 {

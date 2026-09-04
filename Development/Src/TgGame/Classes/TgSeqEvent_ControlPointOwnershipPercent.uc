@@ -1,9 +1,10 @@
 class TgSeqEvent_ControlPointOwnershipPercent extends SequenceEvent
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-var() float OwnershipPercent;
-var() int PointIndex;
+var () float OwnershipPercent;
+var () int PointIndex;
 
 defaultproperties
 {
@@ -11,5 +12,4 @@ defaultproperties
     bPlayerOnly=false
     bClientSideOnly=true
     ObjName="Control Point Ownership Percent"
-	ObjCategory="TgGame"
 }

@@ -1,3 +1,4 @@
 class AkBaseSoundObject extends Object
     abstract
-    native;
+    native
+    config(Engine);

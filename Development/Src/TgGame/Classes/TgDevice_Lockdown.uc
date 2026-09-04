@@ -1,0 +1,9 @@
+class TgDevice_Lockdown extends TgDevice
+    hidecategories(Navigation)
+    config(Engine);
+
+defaultproperties
+{
+    m_bDeployAtFeetOnFailure=true
+    m_fBottomlessPitCheck=70.0000000
+}

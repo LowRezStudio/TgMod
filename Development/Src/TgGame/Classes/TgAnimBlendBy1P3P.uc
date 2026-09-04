@@ -1,0 +1,16 @@
+class TgAnimBlendBy1P3P extends TgAnimNodeBlendList
+    native(Anim)
+    hidecategories(Object,Object,Object,Object)
+    config(Engine);
+
+enum EBlendPerspectiveTypes {
+    BLEND1P3P_1P,  // 0
+    BLEND1P3P_3P,  // 1
+};
+
+var TgPawn m_TgPawn;
+
+defaultproperties
+{
+    Children=/* Array type was not detected. */
+}

@@ -3,5 +3,3 @@ class PComBrowserInteraction extends Interaction
     native
     config(Engine)
     hidecategories(Object,UIRoot);
-
-var private native const noexport Pointer VfTable_FCallbackEventDevice;

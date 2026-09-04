@@ -1,14 +1,12 @@
 class TgSeqAct_ResetCooldowns extends SequenceAction
     native(Kismet)
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-function Activated()
-{ 
-}
+function Activated() { }
 
 defaultproperties
 {
     ObjName="Reset Cooldowns"
-	ObjCategory="TgGame"
 }

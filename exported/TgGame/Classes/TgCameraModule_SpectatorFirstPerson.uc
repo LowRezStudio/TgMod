@@ -1,0 +1,1 @@
+class TgCameraModule_SpectatorFirstPerson extends TgCameraModule_SpectatorThirdPerson;

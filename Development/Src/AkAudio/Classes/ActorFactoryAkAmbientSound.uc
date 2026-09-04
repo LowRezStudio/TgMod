@@ -5,7 +5,7 @@ class ActorFactoryAkAmbientSound extends ActorFactory
     collapsecategories
     hidecategories(Object,Object);
 
-var() AkEvent AmbientEvent;
+var () AkEvent AmbientEvent;
 
 defaultproperties
 {

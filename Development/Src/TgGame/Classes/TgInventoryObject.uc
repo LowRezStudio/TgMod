@@ -1,13 +1,23 @@
 class TgInventoryObject extends Object
-    native(Inventory);
+    native(Inventory)
+    config(Engine)
+    dependson(TgInventoryManager);
 
-enum EReplicatedState
-{
-    IORS_Ok,                        // 0
-    IORS_Edited,                    // 1
-    IORS_Deleted,                   // 2
+enum EReplicatedState {
+    IORS_Ok,  // 0
+    IORS_Edited,  // 1
+    IORS_Deleted,  // 2
 };
 
+struct sInventoryReq {
+    var bool m_bLevelFail;
+    var bool m_bSkillFail;
+    var int m_nSkillLevelReq;
+    var int m_nSkillIdReq;
+    var bool m_bFlairFail;
+    var bool m_bLocationFail;
+    structdefaultproperties {}
+};
 
 var protected InventoryData m_InventoryData;
 var int m_nRefData;
@@ -17,3 +27,18 @@ var TgInventoryObject.EReplicatedState s_ReplicatedState;
 var native const Pointer m_pAmItem;
 var int c_nNbrAcquired;
 var float c_fTimeAcquired;
+
+native function bool IsUsableType();  // Export UTgInventoryObject::execIsUsableType(FFrame&, void* const)
+
+native function bool IsEquippableType();  // Export UTgInventoryObject::execIsEquippableType(FFrame&, void* const)
+
+native function InventoryData GetInventoryData();  // Export UTgInventoryObject::execGetInventoryData(FFrame&, void* const)
+
+native function SetInstanceCount(int nInstanceCount);  // Export UTgInventoryObject::execSetInstanceCount(FFrame&, void* const)
+
+native function int GetInstanceCount();  // Export UTgInventoryObject::execGetInstanceCount(FFrame&, void* const)
+
+defaultproperties
+{
+    m_InventoryData=(nInvId=0,nItemId=0,nPower=0,nInstanceCount=1,bBoundFlag=false,fAcquiredDatetime=0.0000000,nEquipSlotValueId=0)
+}
