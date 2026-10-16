@@ -5,10 +5,13 @@ let download_url = $"https://cdn.xiloe.fr/($version)"
 let install_path = $nu.cache-dir | path join $version
 let output_path = $env.PWD | path join "output"
 
-let manifest_spec_path = $env.PWD | path join "manifest.toml"
+# TEMPEST_MOD_SPEC=<dir> builds another mod from <dir>/manifest.toml + bundle.yaml
+# (bundle paths stay relative to the repo root), e.g. mods/TmLuaTest.
+let spec_dir = ($env.TEMPEST_MOD_SPEC? | default $env.PWD)
+let manifest_spec_path = $spec_dir | path join "manifest.toml"
 let manifest_spec = open $manifest_spec_path
 
-let bundle_spec_path = $env.PWD | path join "bundle.yaml"
+let bundle_spec_path = $spec_dir | path join "bundle.yaml"
 let bundle_spec = open $bundle_spec_path
 # nu <0.102 calls it temp-path, newer versions temp-dir
 let bundle_path = (($nu.temp-path? | default $nu.temp-dir?) | path join "bundle")

@@ -20,3 +20,5 @@
 !UDKGame/Config/
 !UDKGame/Config/DefaultEngine.ini
 !LICENSE
+!mods/
+!mods/**
