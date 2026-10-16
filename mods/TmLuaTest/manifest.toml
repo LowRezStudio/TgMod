@@ -1,0 +1,8 @@
+[mod]
+id = "TmLuaTest"
+name = "TmLuaTest (Lua natives test game mode)"
+version = "0.1.0"
+
+[[mod.authors]]
+name = "Tom"
+link = "https://github.com/Xiloe"

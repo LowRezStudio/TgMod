@@ -96,6 +96,9 @@ var string				SavedNetworkAddress;
  * and opaque in meaning (ie it might mean date/time followed by something else) */
 var repnotify UniqueNetId UniqueId;
 
+/** Hi-Rez addition present in runtime Engine.u; stub must match. */
+var repnotify UniqueNetId ConsoleUniqueId;
+
 /** The session that the player needs to join/remove from as it is created/leaves */
 var const name SessionName;
 
@@ -140,6 +143,7 @@ replication
 		PlayerName, Team, bAdmin,
 		bIsSpectator, bOnlySpectator, bWaitingPlayer, bReadyToPlay,
 		StartTime, bOutOfLives, bFromPreviousLevel,
+		ConsoleUniqueId,
 		// NOTE: This needs to be replicated to the owning client so don't move it from here
 		UniqueId;
 

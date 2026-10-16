@@ -1,9 +1,9 @@
 class TgSeqAct_LaunchHomeInstance extends SequenceAction
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
 defaultproperties
 {
     ObjName="Launch Home Instance"
-	ObjCategory="TgGame"
 }

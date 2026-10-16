@@ -1,0 +1,12 @@
+class TgAIBehaviorAction_StopDevice extends TgAIBehaviorAction
+    hidecategories(Object)
+    config(Engine)
+    dependson(TgObject);
+
+var () TgObject.TG_EQUIP_POINT DeviceToUse;
+
+defaultproperties
+{
+    TitleName="StopDevice"
+    NodeToken=1048620
+}

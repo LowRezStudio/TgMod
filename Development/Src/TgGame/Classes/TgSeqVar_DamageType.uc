@@ -1,12 +1,12 @@
 class TgSeqVar_DamageType extends SequenceVariable
     native(Kismet)
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-var() class<DamageType> DamageTypeValue;
+var () Class<DamageType> DamageTypeValue;
 
 defaultproperties
 {
     ObjName="Damage Type"
-	ObjCategory="TgGame"
 }

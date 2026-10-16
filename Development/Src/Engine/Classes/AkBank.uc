@@ -1,8 +1,9 @@
 class AkBank extends Object
-    native;
+    native
+    config(Engine);
 
-var() bool AutoLoad;
-var() bool GenerateDefinition;
+var () bool AutoLoad;
+var () bool GenerateDefinition;
 var transient bool bIsAsyncLoading;
 
 defaultproperties

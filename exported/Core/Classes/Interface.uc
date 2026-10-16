@@ -1,0 +1,3 @@
+interface Interface
+    abstract
+    native;

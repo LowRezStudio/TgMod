@@ -1,14 +1,15 @@
 class PComPerformanceCaptureNode extends Actor
     native
     placeable
-    hidecategories(Navigation);
+    hidecategories(Navigation)
+    config(Engine);
 
-var(PerformanceNode) string ExecCommand;
-var(PerformanceNode) float DelayBeforeCapture;
+var (PerformanceNode) string ExecCommand;
+var (PerformanceNode) float DelayBeforeCapture;
 
 defaultproperties
 {
     DelayBeforeCapture=2.0000000
-    Components(0)=none
-    Components(1)=none
+    Components[0]=none
+    Components[1]=none
 }

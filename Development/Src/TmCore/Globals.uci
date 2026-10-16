@@ -1,0 +1,10 @@
+`define isDev
+
+`define TmInfo(msg,cat) `log("INFO:" @ `msg, true, `cat)
+`define TmWarn(msg,cat) `log("WARN:" @ `msg, true,`cat)
+`define TmError(msg,cat) `log("ERROR:" @ `msg, true, `cat)
+
+`define UTILS class'TmCore.Utils'.static
+`define UIUTILS class'TmCore.UIUtils'.static
+`define CHAMPS class'TmCore.TmChampions'.static
+`define ABILITYHUD class'TmCore.TmAbilityHud'.static

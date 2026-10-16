@@ -1,2 +1,3 @@
 class PComPositionHistoryComponent extends ActorComponent
-    native;
+    native
+    config(Engine);

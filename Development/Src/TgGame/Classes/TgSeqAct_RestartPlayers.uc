@@ -1,9 +1,9 @@
 class TgSeqAct_RestartPlayers extends SequenceAction
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
 defaultproperties
 {
     ObjName="Restart Players"
-	ObjCategory="TgGame"
 }

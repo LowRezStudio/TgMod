@@ -269,6 +269,12 @@ struct native GameTypePrefix
 	var array<string> ForcedObjects;
 };
 
+enum PIEPawnMeshTypes
+{
+    PIEMESH_UseMeshID,              // 0
+    PIEMESH_MAX                     // 1
+};
+
 /** The default game type to use on a map */
 var config string					DefaultGameType;
 /** Used for loading appropriate game type if non-specified in URL */
@@ -1189,7 +1195,7 @@ function PlayerController SpawnPlayerController(vector SpawnLocation, rotator Sp
 // Login is called, especially if content is downloaded.
 // NOTE: If the AccessControl utilizes PauseLogin, UniqueID should be fully authenticated here
 //
-event PlayerController Login(string Portal, string Options, const UniqueNetID UniqueID, out string ErrorMessage)
+event PlayerController Login(string Portal, string Options, const UniqueNetID UniqueID, out string ErrorMessage, const optional UniqueNetId ConsoleUniqueId)
 {
 	local NavigationPoint StartSpot;
 	local PlayerController NewPlayer;
@@ -1279,6 +1285,8 @@ event PlayerController Login(string Portal, string Options, const UniqueNetID Un
 	if (AccessControl == none || !AccessControl.IsPendingAuth(UniqueId))
 	{
 		NewPlayer.PlayerReplicationInfo.SetUniqueId(UniqueId);
+		// Hi-Rez addition, matches runtime Engine.u.
+		NewPlayer.PlayerReplicationInfo.ConsoleUniqueId = ConsoleUniqueId;
 	}
 
 	if (OnlineSub != None && 

@@ -9,12 +9,12 @@ var int NumberOfClientsToWaitFor;
 /** URL of the actual game to travel to when all clients join */
 var string URLToLoad;
 
-event PlayerController Login(string Portal, string Options, const UniqueNetID UniqueID, out string ErrorMessage)
+event PlayerController Login(string Portal, string Options, const UniqueNetID UniqueID, out string ErrorMessage, const optional UniqueNetId ConsoleUniqueId)
 {
 	local PlayerController PC;
 
 	// perform default behavior to maket he controller
-	PC = super.Login(Portal, Options, UniqueID, ErrorMessage);
+	PC = super.Login(Portal, Options, UniqueID, ErrorMessage, ConsoleUniqueId);
 
 	// if the PC failed to login, don't use it
 	if (PC == none)

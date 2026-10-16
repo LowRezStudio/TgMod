@@ -1,0 +1,79 @@
+class TgDevice_DemonInhand extends TgDevice
+    native(ChampDemon)
+    hidecategories(Navigation);
+
+var bool m_bUltIsActive;
+
+// Export UTgDevice_DemonInhand::execCheckAutoReload(FFrame&, void* const)
+native function bool CheckAutoReload();
+
+// Export UTgDevice_DemonInhand::execRequiresAmmoToFire(FFrame&, void* const)
+native function bool RequiresAmmoToFire();
+
+// Export UTgDevice_DemonInhand::execShouldShowAmmoCount(FFrame&, void* const)
+native function bool ShouldShowAmmoCount();
+
+simulated event SetAmmo(int AmmoCount, optional int ClipSize = -1, optional bool bShouldValidate = false, optional int ValidationIDOverride = 0)
+{
+    super.SetAmmo(AmmoCount, ClipSize, bShouldValidate, ValidationIDOverride);
+    // End:0x7A
+    if(c_DeviceForm != none)
+    {
+        c_DeviceForm.SetAmmoBlendNodesAmount(AmmoCount);
+    }
+    //return;    
+}
+
+simulated function TgGameplayCurvesSet_RecoilSimple GetRecoilCurve()
+{
+    local int I;
+    local TgGameplayCurves GPCurves;
+    local TgGameplayCurvesSet_RecoilSimple recoilCurves;
+
+    GPCurves = GetCurrentGameplayCurves();
+    // End:0x25
+    if(GPCurves == none)
+    {
+        return none;
+    }
+    I = 0;
+    J0x30:
+
+    // End:0x1AD [Loop If]
+    if(I < GPCurves.CurveSets.Length)
+    {
+        // End:0x19F
+        if((GPCurves.CurveSets[I] != none) && int(GPCurves.CurveSets[I].CurveSetType) == int(2))
+        {
+            recoilCurves = TgGameplayCurvesSet_RecoilSimple(GPCurves.CurveSets[I]);
+            // End:0x19F
+            if((recoilCurves != none) && (!m_bUltIsActive && int(recoilCurves.RecoilType) == int(0)) || m_bUltIsActive && int(recoilCurves.RecoilType) == int(2))
+            {
+                return recoilCurves;
+            }
+        }
+        I++;
+        // [Loop Continue]
+        goto J0x30;
+    }
+    return none;
+    //return ReturnValue;    
+}
+
+defaultproperties
+{
+    m_AltFireType=EAltFireType.ALTFIRE_AlternateDevice
+    m_ReticuleType=EReticuleType.RETICULE_Precise
+    m_bAimThroughReticule=true
+    m_bAltFireEnabled=true
+    m_vMeshViewOffset=(X=17.0000000,Y=0.0000000,Z=-5.0000000)
+    m_fWeaponBob=0.0000000
+    m_fMeshFOV=77.0000000
+    m_vProjectileSpawnOffset=(X=30.0000000,Y=9.0000000,Z=-10.0000000)
+    m_fAltFireLockOutTime=0.0000000
+    m_WeaponMeshActorClass=Class'TgGame.TgWeaponMeshActor_DemonInhand'
+    m_ForceFeedbackStartFire=ForceFeedbackWaveform'gp_forcefeedback.LightForceFeedback'
+    m_AccuracySettings=(bUsesAdvancedAccuracy=true,fMaxAccuracy=1.0000000,fMinAccuracy=0.9500000,fAccuracyLossPerShot=0.0200000,fAccuracyGainPerSec=2.0000000,fAccuracyGainDelay=0.1500000,nNumFreeShots=5)
+    m_fReticleBloomScale=0.5000000
+    m_RecoilSettings=(bUsesRecoil=true,fRecoilReductionPerSec=100.0000000,fRecoilCenterDelay=0.1200000,fRecoilSmoothRate=7.0000000)
+}

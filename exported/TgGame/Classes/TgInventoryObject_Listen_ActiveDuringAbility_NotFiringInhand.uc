@@ -1,0 +1,2 @@
+class TgInventoryObject_Listen_ActiveDuringAbility_NotFiringInhand extends TgInventoryObject_Listen_ActiveDuringAbility
+    native(Inventory);

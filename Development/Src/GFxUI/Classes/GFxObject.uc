@@ -248,6 +248,9 @@ native final function GFxObject CreateEmptyMovieClip(string instancename, option
 /** Attaches a symbol to specified movie instance.  If no instance is found in this object's scope with the InstanceName, a new instance is created and returned */
 native final function GFxObject AttachMovie(string symbolname, string instancename, optional int depth = -1, optional class<GFxObject> type = class'GFxObject');
 
+// Export UGFxObject::execRemoveMovieClip(FFrame&, void* const)
+native final function RemoveMovieClip(string PathName);
+
 /** 
  *  Callback when a child widget is initialized within the path bound to this widget via GFxMoviePlayer::SetWidgetPathBinding().  Allows for GFxObject subclasses that encapsulate
  *  functionality to handle their own initialization for child widgets, instead of the GFxMoviePlayer.  Returns TRUE if the widget was handled, FALSE if not.   
@@ -259,3 +262,73 @@ event bool WidgetInitialized(name WidgetName, name WidgetPath, GFxObject Widget)
  *  Returns TRUE if the widget was handled, FALSE if not.
  */
 event bool WidgetUnloaded(name WidgetName, name WidgetPath, GFxObject Widget);
+
+
+// Export UGFxObject::execSetX(FFrame&, void* const)
+native final function SetX(float fValue);
+
+// Export UGFxObject::execSetY(FFrame&, void* const)
+native final function SetY(float fValue);
+
+// Export UGFxObject::execSetAlpha(FFrame&, void* const)
+native final function SetAlpha(float fValue);
+
+// Export UGFxObject::execSetWidth(FFrame&, void* const)
+native final function SetWidth(float fValue);
+
+// Export UGFxObject::execSetHeight(FFrame&, void* const)
+native final function SetHeight(float fValue);
+
+// Export UGFxObject::execSetXScale(FFrame&, void* const)
+native final function SetXScale(float fValue);
+
+// Export UGFxObject::execSetYScale(FFrame&, void* const)
+native final function SetYScale(float fValue);
+
+// Export UGFxObject::execSetDisabled(FFrame&, void* const)
+native final function SetDisabled(bool bValue);
+
+// Export UGFxObject::execSetRotation(FFrame&, void* const)
+native final function SetRotation(float fValue);
+
+// Export UGFxObject::execSetXRotation(FFrame&, void* const)
+native final function SetXRotation(float fValue);
+
+// Export UGFxObject::execSetYRotation(FFrame&, void* const)
+native final function SetYRotation(float fValue);
+
+// Export UGFxObject::execGetX(FFrame&, void* const)
+native final function float GetX();
+
+// Export UGFxObject::execGetY(FFrame&, void* const)
+native final function float GetY();
+
+// Export UGFxObject::execGetAlpha(FFrame&, void* const)
+native final function float GetAlpha();
+
+// Export UGFxObject::execGetWidth(FFrame&, void* const)
+native final function float GetWidth();
+
+// Export UGFxObject::execGetHeight(FFrame&, void* const)
+native final function float GetHeight();
+
+// Export UGFxObject::execGetXScale(FFrame&, void* const)
+native final function float GetXScale();
+
+// Export UGFxObject::execGetYScale(FFrame&, void* const)
+native final function float GetYScale();
+
+// Export UGFxObject::execGetRotation(FFrame&, void* const)
+native final function float GetRotation();
+
+// Export UGFxObject::execGetXRotation(FFrame&, void* const)
+native final function float GetXRotation();
+
+// Export UGFxObject::execGetYRotation(FFrame&, void* const)
+native final function float GetYRotation();
+
+// Export UGFxObject::execGetTextWidth(FFrame&, void* const)
+native final function float GetTextWidth();
+
+// Export UGFxObject::execGetTextHeight(FFrame&, void* const)
+native final function float GetTextHeight();

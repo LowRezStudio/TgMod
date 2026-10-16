@@ -1,0 +1,7 @@
+# Standalone test mod for Tempest.Scripting's Lua-implemented natives:
+#   TEMPEST_MOD_SPEC=mods/TmLuaTest nu tool.nu   ->   output/TmLuaTest.tempest
+# Paths are relative to the repo root (tool.nu globs them from there).
+files:
+  "mods/TmLuaTest/manifest.toml": "manifest.toml"
+  "mods/TmLuaTest/Config/*": "files/ChaosGame/Config/"
+  "UDKGame/Script/TmLuaTest.u": "files/ChaosGame/CookedPCConsole/TmLuaTest.upk"

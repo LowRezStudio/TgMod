@@ -1,0 +1,1 @@
+class TgDeviceForm_SniperMode extends TgDeviceForm_ToggleWithLockout;

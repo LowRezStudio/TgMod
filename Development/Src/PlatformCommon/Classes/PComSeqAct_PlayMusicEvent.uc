@@ -1,12 +1,13 @@
 class PComSeqAct_PlayMusicEvent extends SequenceAction
     native(Audio)
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-var() name EventName;
+var () name EventName;
 
 defaultproperties
 {
-    //VariableLinks=none
+    VariableLinks=none
     ObjName="Play Music Event"
 }

@@ -1,9 +1,9 @@
 class TgSeqAct_AIStopFire extends SequenceAction
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
 defaultproperties
 {
     ObjName="Stop Firing"
-	ObjCategory="TgGame"
 }

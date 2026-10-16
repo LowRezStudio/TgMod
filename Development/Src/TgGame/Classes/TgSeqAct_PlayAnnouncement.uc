@@ -1,22 +1,18 @@
 class TgSeqAct_PlayAnnouncement extends SequenceAction
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-var() bool bPlayImmediately;
-var() bool bFlushOthers;
-var() int SoundIndex;
-var() SoundCue OptionalCue;
+var () bool bPlayImmediately;
+var () bool bFlushOthers;
+var () int SoundIndex;
+var () SoundCue OptionalCue;
 
-event Activated()
-{ 
-}
+event Activated() { }
 
-static event int GetObjClassVersion()
-{
-}
+static event int GetObjClassVersion() { }
 
 defaultproperties
 {
     ObjName="Tutorial Announcement"
-	ObjCategory="TgGame"
 }

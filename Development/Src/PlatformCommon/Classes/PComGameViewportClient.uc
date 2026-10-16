@@ -8,44 +8,20 @@ var transient PComInputLightingEffect InputLightingEffect;
 var config bool bUseDynamicResolutionScaler;
 var native transient Pointer DynamicResolutionScaler;
 
-// Export UPComGameViewportClient::execInitDynamicResolutionScaler(FFrame&, void* const)
-native final function InitDynamicResolutionScaler();
+native function InitDynamicResolutionScaler();  // Export UPComGameViewportClient::execInitDynamicResolutionScaler(FFrame&, void* const)
 
-// Export UPComGameViewportClient::execGetCurrentGameSettingsVersion(FFrame&, void* const)
-native function int GetCurrentGameSettingsVersion();
+native function int GetCurrentGameSettingsVersion();  // Export UPComGameViewportClient::execGetCurrentGameSettingsVersion(FFrame&, void* const)
 
-// Export UPComGameViewportClient::execHandleGameSettingsMigration(FFrame&, void* const)
-native function HandleGameSettingsMigration(int OldGameSettingsVersion);
+native function HandleGameSettingsMigration(int OldGameSettingsVersion);  // Export UPComGameViewportClient::execHandleGameSettingsMigration(FFrame&, void* const)
 
-// Export UPComGameViewportClient::execCheckGameSettingsVersion(FFrame&, void* const)
-native final function CheckGameSettingsVersion();
+native function CheckGameSettingsVersion();  // Export UPComGameViewportClient::execCheckGameSettingsVersion(FFrame&, void* const)
 
-exec function SetRTMPSettings(bool bAllowWebcam, bool bAllowMicrophone, bool bAllowDesktopAudio)
-{
-    //return;    
-}
+exec function SetRTMPSettings(bool bAllowWebcam, bool bAllowMicrophone, bool bAllowDesktopAudio) { }
 
-exec function StartRTMPStreaming(string InServer, string InKey)
-{
-    //return;    
-}
+exec function StartRTMPStreaming(string InServer, string InKey) { }
 
-exec function StopRTMPStreaming()
-{
-    //return;    
-}
+exec function StopRTMPStreaming() { }
 
-exec function StartFacebookStreaming()
-{
-    //return;    
-}
+exec function StartFacebookStreaming() { }
 
-event bool Init(out string OutError)
-{
-    CheckGameSettingsVersion();
-    OpenBroadcaster = new (self) Class'PComOpenBroadcaster';
-    InputLightingEffect = new (self) Class'PComInputLightingEffect';
-    InitDynamicResolutionScaler();
-    return super.Init(OutError);
-    //return ReturnValue;    
-}
+event bool Init(out string OutError) { }

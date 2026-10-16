@@ -1,0 +1,1 @@
+class TgDeviceForm_DarkConvergenceSub extends TgDeviceForm;

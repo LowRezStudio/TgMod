@@ -1,0 +1,10 @@
+class TgAIBehaviorAction_MoveToLanePusherFront extends TgAIBehaviorAction_MoveToTarget
+    hidecategories(Object);
+
+var() TgObject.TG_EQUIP_POINT DeviceSlot;
+
+defaultproperties
+{
+    TitleName="MoveToLanePusherFront"
+    NodeToken=1048716
+}

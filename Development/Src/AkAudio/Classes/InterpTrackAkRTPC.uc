@@ -1,12 +1,13 @@
 class InterpTrackAkRTPC extends InterpTrackFloatBase
     native
     collapsecategories
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-var() string Param;
+var () string Param;
 
 defaultproperties
 {
-    TrackInstClass=Class'AkAudio.InterpTrackInstAkRTPC'
+    TrackInstClass=Class'InterpTrackInstAkRTPC'
     TrackTitle="AkRTPC"
 }

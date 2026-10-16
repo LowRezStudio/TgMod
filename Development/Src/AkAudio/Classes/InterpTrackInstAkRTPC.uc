@@ -1,2 +1,3 @@
 class InterpTrackInstAkRTPC extends InterpTrackInst
-    native;
+    native
+    config(Engine);

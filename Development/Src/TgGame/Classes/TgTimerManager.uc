@@ -1,48 +1,64 @@
 class TgTimerManager extends Object
-    native;
+    native
+    config(Engine);
 
+const TGT_MAX_TIMERS = 32;
 
-// Export UTgTimerManager::execStart(FFrame&, void* const)
-native function bool Start(int byTimerIndex, float fTime, optional bool bRepeat = false, optional bool bPausedByGame = true, optional float Rate = 1.0000000);
+enum TGT_EVENT {
+    TGTE_DONE,  // 0
+    TGTE_START,  // 1
+    TGTE_UPDATE,  // 2
+    TGTE_PAUSED,  // 3
+};
 
-// Export UTgTimerManager::execUpdate(FFrame&, void* const)
-native function bool Update(int byTimerIndex, float fTime, optional float fTimeInitial = -1.0000000, optional float Rate = 1.0000000);
+struct TGT_REG_LINK {
+    var Pointer NextLink;
+    var Object RegObject;
+    var Function RegFunction;
+    structdefaultproperties {}
+};
 
-// Export UTgTimerManager::execPause(FFrame&, void* const)
-native function bool Pause(int byTimerIndex, float fTime);
+struct TgTimerData {
+    var int nIndex;
+    var byte byTimer;
+    var float fStartTime;
+    var float fRemaining;
+    var bool bRepeat;
+    var bool bPausedByGame;
+    var float Rate;
+    var TGT_REG_LINK CallbackRegistry;
+    structdefaultproperties {}
+};
 
-// Export UTgTimerManager::execClose(FFrame&, void* const)
-native function bool Close(int byTimerIndex, optional bool bFireEvent = true);
+var protected bool m_bActive;
+var protected bool m_bGameWasPaused;
 
-// Export UTgTimerManager::execIsSet(FFrame&, void* const)
-native simulated function bool IsSet(int byTimerIndex);
+native function bool Start(int byTimerIndex, float fTime, optional bool bRepeat=false, optional bool bPausedByGame=true, optional float Rate=1.0000000);  // Export UTgTimerManager::execStart(FFrame&, void* const)
 
-// Export UTgTimerManager::execIsPaused(FFrame&, void* const)
-native simulated function bool IsPaused(int byTimerIndex);
+native function bool Update(int byTimerIndex, float fTime, optional float fTimeInitial=-1.0000000, optional float Rate=1.0000000);  // Export UTgTimerManager::execUpdate(FFrame&, void* const)
 
-// Export UTgTimerManager::execGetTimeElapsed(FFrame&, void* const)
-native simulated function float GetTimeElapsed(int byTimerIndex);
+native function bool Pause(int byTimerIndex, float fTime);  // Export UTgTimerManager::execPause(FFrame&, void* const)
 
-// Export UTgTimerManager::execGetTimeRemaining(FFrame&, void* const)
-native simulated function float GetTimeRemaining(int byTimerIndex);
+native function bool Close(int byTimerIndex, optional bool bFireEvent=true);  // Export UTgTimerManager::execClose(FFrame&, void* const)
 
-// Export UTgTimerManager::execGetPercentRemaining(FFrame&, void* const)
-native simulated function float GetPercentRemaining(int byTimerIndex);
+native simulated function bool IsSet(int byTimerIndex);  // Export UTgTimerManager::execIsSet(FFrame&, void* const)
 
-// Export UTgTimerManager::execGetTimeInitial(FFrame&, void* const)
-native simulated function float GetTimeInitial(int byTimerIndex);
+native simulated function bool IsPaused(int byTimerIndex);  // Export UTgTimerManager::execIsPaused(FFrame&, void* const)
 
-// Export UTgTimerManager::execSetRate(FFrame&, void* const)
-native simulated function SetRate(int TimerIndex, float Rate);
+native simulated function float GetTimeElapsed(int byTimerIndex);  // Export UTgTimerManager::execGetTimeElapsed(FFrame&, void* const)
 
-// Export UTgTimerManager::execRegisterForEvents(FFrame&, void* const)
-native simulated function bool RegisterForEvents(int byTimerIndex, Object HostObject, name nmFunc);
+native simulated function float GetTimeRemaining(int byTimerIndex);  // Export UTgTimerManager::execGetTimeRemaining(FFrame&, void* const)
 
-// Export UTgTimerManager::execUnRegisterForEvents(FFrame&, void* const)
-native simulated function bool UnRegisterForEvents(int byTimerIndex, Object HostObject);
+native simulated function float GetPercentRemaining(int byTimerIndex);  // Export UTgTimerManager::execGetPercentRemaining(FFrame&, void* const)
 
-// Export UTgTimerManager::execIsActiveTimers(FFrame&, void* const)
-native simulated function bool IsActiveTimers();
+native simulated function float GetTimeInitial(int byTimerIndex);  // Export UTgTimerManager::execGetTimeInitial(FFrame&, void* const)
 
-// Export UTgTimerManager::execCloseAllTimers(FFrame&, void* const)
-native simulated function CloseAllTimers(optional bool bFireEvent = true);
+native simulated function SetRate(int TimerIndex, float Rate);  // Export UTgTimerManager::execSetRate(FFrame&, void* const)
+
+native simulated function bool RegisterForEvents(int byTimerIndex, Object HostObject, name nmFunc);  // Export UTgTimerManager::execRegisterForEvents(FFrame&, void* const)
+
+native simulated function bool UnRegisterForEvents(int byTimerIndex, Object HostObject);  // Export UTgTimerManager::execUnRegisterForEvents(FFrame&, void* const)
+
+native simulated function bool IsActiveTimers();  // Export UTgTimerManager::execIsActiveTimers(FFrame&, void* const)
+
+native simulated function CloseAllTimers(optional bool bFireEvent=true);  // Export UTgTimerManager::execCloseAllTimers(FFrame&, void* const)

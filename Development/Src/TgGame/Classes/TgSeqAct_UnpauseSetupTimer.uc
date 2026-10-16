@@ -1,14 +1,12 @@
 class TgSeqAct_UnpauseSetupTimer extends SequenceAction
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-function Activated()
-{   
-}
+function Activated() { }
 
 defaultproperties
 {
-    //VariableLinks=none
+    VariableLinks=none
     ObjName="Unpause Setup Timer"
-	ObjCategory="TgGame"
 }

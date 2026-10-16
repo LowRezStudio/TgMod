@@ -1,28 +1,27 @@
 class TgSeqAct_SetInputEnabled extends SequenceAction
     native(Kismet)
     forcescriptorder(true)
-    hidecategories(Object);
+    hidecategories(Object)
+    config(Engine);
 
-var() bool bEnableMoveForward;
-var() bool bEnableMoveBackward;
-var() bool bEnableMoveLeft;
-var() bool bEnableMoveRight;
-var() bool bEnableLookUp;
-var() bool bEnableLookDown;
-var() bool bEnableLookLeft;
-var() bool bEnableLookRight;
-var() bool bEnableJumping;
-var() bool bEnableMounting;
-var() bool bEnableAuto;
-var() bool bEnableAlt;
-var() bool bEnableBattleAbility;
-var() bool bEnableMovementAbility;
-var() bool bEnableUltimate;
-var() bool bEnableEmote;
+var () bool bEnableMoveForward;
+var () bool bEnableMoveBackward;
+var () bool bEnableMoveLeft;
+var () bool bEnableMoveRight;
+var () bool bEnableLookUp;
+var () bool bEnableLookDown;
+var () bool bEnableLookLeft;
+var () bool bEnableLookRight;
+var () bool bEnableJumping;
+var () bool bEnableMounting;
+var () bool bEnableAuto;
+var () bool bEnableAlt;
+var () bool bEnableBattleAbility;
+var () bool bEnableMovementAbility;
+var () bool bEnableUltimate;
+var () bool bEnableEmote;
 
-function Activated()
-{
-}
+function Activated() { }
 
 defaultproperties
 {
@@ -43,5 +42,4 @@ defaultproperties
     bEnableUltimate=true
     bEnableEmote=true
     ObjName="Set Input Enabled/Disabled"
-	ObjCategory="TgGame"
 }

@@ -1,7 +1,7 @@
 class PComMusicThemePlayer extends Object
-    native(Audio);
+    native(Audio)
+    config(Engine);
 
-var private native const noexport Pointer VfTable_FTickableObject;
 var transient string MusicThemePath;
 var transient PComMusicTheme MusicTheme;
 var export editinline transient AudioComponent MusicComp;
@@ -11,35 +11,25 @@ var transient MusicTrackStruct CurrentMusicTrack;
 var transient float CurrentMusicTrackStartTime;
 var transient float CurrentMusicTrackDuration;
 
-// Export UPComMusicThemePlayer::execInit(FFrame&, void* const)
-native function Init();
+native function Init();  // Export UPComMusicThemePlayer::execInit(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execLoadDefaultTheme(FFrame&, void* const)
-native function LoadDefaultTheme();
+native function LoadDefaultTheme();  // Export UPComMusicThemePlayer::execLoadDefaultTheme(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execGetDefaultThemePath(FFrame&, void* const)
-native function string GetDefaultThemePath();
+native function string GetDefaultThemePath();  // Export UPComMusicThemePlayer::execGetDefaultThemePath(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execLoadTheme(FFrame&, void* const)
-native function LoadTheme(const string themepath);
+native function LoadTheme(const string themepath);  // Export UPComMusicThemePlayer::execLoadTheme(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execOnThemeLoaded(FFrame&, void* const)
-native function OnThemeLoaded();
+native function OnThemeLoaded();  // Export UPComMusicThemePlayer::execOnThemeLoaded(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execPlayDefaultMusic(FFrame&, void* const)
-native function PlayDefaultMusic();
+native function PlayDefaultMusic();  // Export UPComMusicThemePlayer::execPlayDefaultMusic(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execPlayMusicEvent(FFrame&, void* const)
-native function PlayMusicEvent(const name EventName);
+native function PlayMusicEvent(const name EventName);  // Export UPComMusicThemePlayer::execPlayMusicEvent(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execStopMusic(FFrame&, void* const)
-native function StopMusic();
+native function StopMusic();  // Export UPComMusicThemePlayer::execStopMusic(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execUpdateMusicTrack(FFrame&, void* const)
-native function UpdateMusicTrack(const MusicTrackStruct NewMusicTrack, const optional float fDuration = 0.0000000);
+native function UpdateMusicTrack(const MusicTrackStruct NewMusicTrack, const optional float fDuration=0.0000000);  // Export UPComMusicThemePlayer::execUpdateMusicTrack(FFrame&, void* const)
 
-// Export UPComMusicThemePlayer::execUpdateReplicatedMusicEvent(FFrame&, void* const)
-native function UpdateReplicatedMusicEvent(const name EventName);
+native function UpdateReplicatedMusicEvent(const name EventName);  // Export UPComMusicThemePlayer::execUpdateReplicatedMusicEvent(FFrame&, void* const)
 
 defaultproperties
 {
