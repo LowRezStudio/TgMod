@@ -31,6 +31,17 @@ dllimport final function bool LuaOnPlayerSpawned(int PlayerId, out Vector Boost)
 // No return value: a periodic callback into Lua.
 dllimport final function LuaHeartbeat(float Elapsed, int Count);
 
+// The other way to hand a function to Lua: an ordinary function with a stub
+// body. Any UnrealScript types work here, object references included, and
+// the body is what runs when no Lua handler is registered.
+function string LuaDescribe(Actor A) {
+    return "(LuaDescribe not implemented in Lua)";
+}
+
+function bool LuaControllerOf(Pawn P, out Controller C) {
+    return false;
+}
+
 event PostBeginPlay() {
     super.PostBeginPlay();
     `log("TmLuaGame: LuaAdd(2, 3) = " $ LuaAdd(2, 3) $ ", LuaGreet = '" $ LuaGreet("PostBeginPlay") $ "'");
@@ -46,15 +57,21 @@ event PostLogin(PlayerController NewPlayer) {
     super.PostLogin(NewPlayer);
     NewPlayer.ClientMessage("TmLuaGame: LuaAdd(2, 3) = " $ LuaAdd(2, 3));
     NewPlayer.ClientMessage("TmLuaGame: LuaGreet = " $ LuaGreet(NewPlayer.PlayerReplicationInfo.PlayerName));
+    NewPlayer.ClientMessage("TmLuaGame: LuaDescribe(PC) = " $ LuaDescribe(NewPlayer));
 }
 
 function RestartPlayer(Controller NewPlayer) {
     local Vector Boost;
+    local Controller C;
 
     super.RestartPlayer(NewPlayer);
     if (NewPlayer.Pawn != None && LuaOnPlayerSpawned(NewPlayer.PlayerReplicationInfo.PlayerID, Boost)) {
         NewPlayer.Pawn.Velocity += Boost;
         `log("TmLuaGame: spawn boost " $ Boost.X $ " " $ Boost.Y $ " " $ Boost.Z);
+    }
+    if (NewPlayer.Pawn != None && LuaControllerOf(NewPlayer.Pawn, C) && PlayerController(NewPlayer) != None) {
+        PlayerController(NewPlayer).ClientMessage("TmLuaGame: LuaControllerOf(" $ NewPlayer.Pawn $ ") = " $ C
+            $ " (" $ LuaDescribe(NewPlayer.Pawn) $ ")");
     }
 }
 
