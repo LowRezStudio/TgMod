@@ -1,0 +1,2 @@
+// Package-local macros. Empty for now; logging goes through Core's
+// `LogInfo/`LogWarn/`LogError with the 'TmNetwork' category.
